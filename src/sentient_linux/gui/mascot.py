@@ -88,6 +88,9 @@ class LivingMascot(Gtk.DrawingArea):
                 self._error_timestamp = now
             self.queue_draw()
 
+    def set_state(self, new_state: MascotState) -> None:
+        self.state = new_state
+
     def _get_period(self, state: MascotState) -> float:
         """Upstream SpinningLogo.swift: 2.0s fast processing, 13.0s idle spin."""
         if state in (MascotState.THINKING, MascotState.ACTING):

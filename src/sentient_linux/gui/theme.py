@@ -103,15 +103,52 @@ window.sentient-pill-window {
    SIDEKICK EXTENDED WINDOW SURFACE (Flush to Screen Bottom Bezel)
    ========================================================================= */
 .sidekick-expanded, .living-glass-expanded {
-    background-color: rgba(10, 10, 13, 0.94);
+    background-color: rgba(10, 10, 13, 0.96);
     border: 0.75px solid rgba(255, 255, 255, 0.14);
     border-bottom: none;
     border-top-left-radius: 24px;
     border-top-right-radius: 24px;
     border-bottom-left-radius: 0;
     border-bottom-right-radius: 0;
-    box-shadow: 0 -24px 64px rgba(0, 0, 0, 0.90), 0 0 32px rgba(158, 140, 255, 0.10);
-    padding: 16px 24px 14px 24px;
+    box-shadow: 0 -24px 64px rgba(0, 0, 0, 0.90), 0 0 1px rgba(255, 255, 255, 0.15);
+    padding: 12px 18px 18px 18px;
+}
+
+/* Official Sidekick Card Header (uploaded_media_1_1793269445180.png / Hero parity) */
+.sidekick-header-card {
+    background-color: rgba(16, 16, 20, 0.95);
+    border: 0.75px solid rgba(255, 255, 255, 0.12);
+    border-radius: 16px;
+    margin: 4px 6px 4px 6px;
+}
+
+.sidekick-header-inner {
+    padding: 10px 14px;
+}
+
+.sidekick-card-title {
+    font-size: 15px;
+    font-weight: 600;
+    color: #ffffff;
+    letter-spacing: -0.2px;
+}
+
+.sidekick-card-subtitle {
+    font-size: 12px;
+    font-weight: 400;
+    color: #878787;
+}
+
+.sidekick-model-pill {
+    background-color: rgba(255, 255, 255, 0.05);
+    border: 0.75px solid rgba(255, 255, 255, 0.09);
+    border-radius: 12px;
+    padding: 4px 10px;
+}
+
+.sidekick-context-bar {
+    padding: 2px 14px;
+    margin-bottom: 2px;
 }
 
 /* =========================================================================
