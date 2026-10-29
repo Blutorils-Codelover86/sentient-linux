@@ -1,11 +1,10 @@
 """
-Automated state capture script for Sentient Linux Notch interaction hierarchy.
-Captures:
-1. Resting compact notch (HIDDEN)
-2. Interactive quick prompt input (TYPING)
-3. Active computer-use progress & GlowHalo edge glow (RUNNING)
-4. Inline response preview & quick reply (MESSAGE)
-5. Full Sidekick conversation (EXPANDED)
+Automated capture script for hover-driven Sentient Linux Notch interaction.
+Validates:
+- Compact resting notch has no expand/collapse buttons.
+- Pointer hover smoothly expands into small interactive notch (TYPING).
+- Moving pointer away collapses after 200ms grace window.
+- Typing keeps notch open even if pointer leaves.
 """
 
 from __future__ import annotations
@@ -27,15 +26,13 @@ os.makedirs(ARTIFACT_DIR, exist_ok=True)
 
 def capture_step(step_name: str, filename: str):
     output_path = os.path.join(ARTIFACT_DIR, filename)
-    # Capture bottom region (center 800px width, bottom 600px height)
-    # Using grim to capture full display or crop to bottom center
     cmd = f"grim {output_path}"
     subprocess.run(cmd, shell=True, check=True)
     print(f"Captured {step_name} -> {output_path}")
 
 
 def main():
-    app = Gtk.Application(application_id="ai.sentient.linux.capture")
+    app = Gtk.Application(application_id="ai.sentient.linux.hovercapture")
 
     def on_activate(application):
         provider = Gtk.CssProvider()
@@ -52,46 +49,39 @@ def main():
         window = SentientPillWindow(app=application, coordinator=coordinator, reduced_motion=True)
         window.present()
 
-        # Step 1: Capture resting notch (HIDDEN) after 600ms
+        # Step 1: Capture resting notch (HIDDEN)
         def step1():
-            capture_step("Phase 1: Resting Notch (HIDDEN)", "notch_phase1_resting.png")
-            # Step 2: Open quick input (TYPING)
-            window.open_notch_input()
-            window.typing_entry.set_text("Summarize open browser tabs")
-            GLib.timeout_add(600, step2)
+            capture_step("1. Resting Compact Notch (No Buttons)", "hover_notch_resting.png")
+            # Step 2: Hover pointer enters compact notch -> expands to small interactive notch
+            window._on_motion_enter(None, 10.0, 10.0)
+            GLib.timeout_add(500, step2)
             return False
 
         def step2():
-            capture_step("Phase 2: Quick Input (TYPING)", "notch_phase2_typing.png")
-            # Step 3: Enter RUNNING with edge glow
-            window.set_phase(NotchPhase.RUNNING)
-            window.status_line.set_text("mcp: sentient_native/click (completed)...")
-            GLib.timeout_add(600, step3)
+            capture_step("2. Hover-Expanded Interactive Notch", "hover_notch_expanded.png")
+            # Step 3: Type into entry
+            window.typing_entry.set_text("Summarize open workspace")
+            # Simulate pointer moving away while typing -> should STAY OPEN
+            window._on_motion_leave(None)
+            GLib.timeout_add(500, step3)
             return False
 
         def step3():
-            capture_step("Phase 3: Active Progress (RUNNING)", "notch_phase3_running.png")
-            # Step 4: Enter MESSAGE with inline response and reply bar
-            sample_answer = "I've checked your browser tabs. You have 3 tabs open: Sentient OS GitHub, Omarchy Documentation, and Arch Linux Wiki."
-            window.set_phase(NotchPhase.MESSAGE, message_text=sample_answer)
-            window.reply_entry.set_text("Can you export the bookmarks?")
-            GLib.timeout_add(600, step4)
+            capture_step("3. Typing Keeps Notch Open When Pointer Leaves", "hover_notch_typing_stay.png")
+            # Step 4: Clear text and trigger collapse
+            window.typing_entry.set_text("")
+            window._on_motion_leave(None)
+            # Wait past the 200ms grace window
+            GLib.timeout_add(350, step4)
             return False
 
         def step4():
-            capture_step("Phase 4: Inline Response & Reply (MESSAGE)", "notch_phase4_message.png")
-            # Step 5: Expand into Full Sidekick conversation
-            window.expand(draft="Can you export the bookmarks?")
-            GLib.timeout_add(700, step5)
-            return False
-
-        def step5():
-            capture_step("Phase 5: Full Sidekick Conversation (EXPANDED)", "notch_phase5_expanded.png")
-            print("All 5 interaction phases captured successfully!")
+            capture_step("4. Auto-Collapsed After Pointer Leaves", "hover_notch_collapsed.png")
+            print("All hover-driven notch states captured successfully!")
             GLib.timeout_add(300, app.quit)
             return False
 
-        GLib.timeout_add(700, step1)
+        GLib.timeout_add(600, step1)
 
     app.connect("activate", on_activate)
     app.run([])

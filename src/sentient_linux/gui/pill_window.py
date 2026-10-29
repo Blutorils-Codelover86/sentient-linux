@@ -208,6 +208,9 @@ class SentientPillWindow(Gtk.Window):
         self.phase: NotchPhase = NotchPhase.HIDDEN
         self.is_expanded: bool = False
         self.is_running: bool = False
+        self._is_pointer_inside: bool = False
+        self._is_pointer_pressed: bool = False
+        self._collapse_timer_id: int = 0
         self._current_request_id: int = 0
         self._task_start_time: float = 0.0
 
@@ -299,8 +302,112 @@ class SentientPillWindow(Gtk.Window):
         self.pill_overlay.add_overlay(self.pill_stack)
         self.root_box.append(self.pill_overlay)
 
+        # Single shared hover region covering compact and expanded geometry
+        self._init_hover_controller()
+
+    def _init_hover_controller(self) -> None:
+        """
+        Unified hover region covering compact and small interactive notch.
+        Hover -> Expand small notch -> Move away -> Collapse after 200ms.
+        """
+        motion_ctrl = Gtk.EventControllerMotion()
+        motion_ctrl.connect("enter", self._on_motion_enter)
+        motion_ctrl.connect("leave", self._on_motion_leave)
+        self.pill_overlay.add_controller(motion_ctrl)
+
+        # Track active pointer clicks/drags to avoid collapsing during interaction
+        click_gesture = Gtk.GestureClick()
+        click_gesture.connect("pressed", self._on_pointer_pressed)
+        click_gesture.connect("released", self._on_pointer_released)
+        click_gesture.connect("stopped", self._on_pointer_released)
+        self.pill_overlay.add_controller(click_gesture)
+
+        # Focus controller to keep notch open while typing or focused
+        focus_ctrl = Gtk.EventControllerFocus()
+        focus_ctrl.connect("leave", self._on_focus_leave)
+        self.pill_overlay.add_controller(focus_ctrl)
+
+    def _on_motion_enter(self, _ctrl: Gtk.EventControllerMotion, _x: float, _y: float) -> None:
+        self._is_pointer_inside = True
+
+        # Requirement 4: Cancel pending collapse immediately if pointer re-enters
+        if self._collapse_timer_id != 0:
+            GLib.source_remove(self._collapse_timer_id)
+            self._collapse_timer_id = 0
+
+        # Requirement 2: Pointer enters compact notch -> smoothly expand into small interactive notch
+        if not self.is_expanded and self.phase == NotchPhase.HIDDEN:
+            self.set_phase(NotchPhase.TYPING)
+
+    def _on_motion_leave(self, _ctrl: Gtk.EventControllerMotion) -> None:
+        self._is_pointer_inside = False
+        self._maybe_schedule_collapse()
+
+    def _on_pointer_pressed(self, _gesture, _n_press, _x, _y) -> None:
+        self._is_pointer_pressed = True
+        if self._collapse_timer_id != 0:
+            GLib.source_remove(self._collapse_timer_id)
+            self._collapse_timer_id = 0
+
+    def _on_pointer_released(self, _gesture, _n_press=None, _x=None, _y=None) -> None:
+        self._is_pointer_pressed = False
+        if not self._is_pointer_inside:
+            self._maybe_schedule_collapse()
+
+    def _on_focus_leave(self, _ctrl: Gtk.EventControllerFocus) -> None:
+        if not self._is_pointer_inside:
+            self._maybe_schedule_collapse()
+
+    def _on_entry_focus_changed(self, entry: Gtk.Entry, _param) -> None:
+        if not entry.has_focus() and not self._is_pointer_inside:
+            self._maybe_schedule_collapse()
+
+    def _maybe_schedule_collapse(self) -> None:
+        if self.is_expanded or self.phase == NotchPhase.HIDDEN:
+            return
+
+        # Requirement 5: Keep notch open while task is running
+        if self.is_running or self.phase == NotchPhase.RUNNING:
+            return
+
+        # Keep open while typing entry has focus or text
+        if self.phase == NotchPhase.TYPING:
+            if self.typing_entry.has_focus() or bool(self.typing_entry.get_text().strip()):
+                return
+
+        # Keep open while reply entry has focus or text
+        if self.phase == NotchPhase.MESSAGE:
+            if self.reply_entry.has_focus() or bool(self.reply_entry.get_text().strip()):
+                return
+
+        # Requirement 6: Do not collapse during active pointer interaction
+        if self._is_pointer_pressed:
+            return
+
+        # Requirement 3: Automatically collapse after 200 ms delay
+        if self._collapse_timer_id != 0:
+            GLib.source_remove(self._collapse_timer_id)
+        self._collapse_timer_id = GLib.timeout_add(200, self._on_collapse_timeout)
+
+    def _on_collapse_timeout(self) -> bool:
+        self._collapse_timer_id = 0
+        if not self._is_pointer_inside and not self.is_expanded:
+            if self.is_running or self.phase == NotchPhase.RUNNING:
+                return False
+            if self.phase == NotchPhase.TYPING:
+                if self.typing_entry.has_focus() or bool(self.typing_entry.get_text().strip()):
+                    return False
+            if self.phase == NotchPhase.MESSAGE:
+                if self.reply_entry.has_focus() or bool(self.reply_entry.get_text().strip()):
+                    return False
+            if self._is_pointer_pressed:
+                return False
+
+            self.set_phase(NotchPhase.HIDDEN)
+        return False
+
     def _build_idle_view(self) -> None:
-        """Resting notch (340x44): Click opens TYPING quick input."""
+        """Resting notch (340x44): Completely hover-driven to expand into TYPING."""
         self.idle_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
         self.idle_box.add_css_class("bottom-notch-content")
         self.idle_box.set_valign(Gtk.Align.CENTER)
@@ -319,19 +426,12 @@ class SentientPillWindow(Gtk.Window):
         self.pill_label.set_xalign(0.0)
         self.idle_box.append(self.pill_label)
 
-        right_glyph = Gtk.Label(label="⌃")
-        right_glyph.add_css_class("whisper-text")
-        self.idle_box.append(right_glyph)
-
-        # Official upstream behavior: Click on resting notch opens quick typing field
-        click_gesture = Gtk.GestureClick()
-        click_gesture.connect("released", lambda *_: self.open_notch_input())
-        self.idle_box.add_controller(click_gesture)
+        # Removed expand glyph ⌃ and click gesture: small notch is hover-driven
 
         self.pill_stack.add_named(self.idle_box, "hidden")
 
     def _build_typing_view(self) -> None:
-        """Interactive notch for quick prompt (480x72): Esc cancels, ⇱ opens Full Sidekick."""
+        """Interactive notch for quick prompt (480x72): Esc cancels, Send submits."""
         self.typing_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
         self.typing_box.add_css_class("bottom-notch-content")
         self.typing_box.set_valign(Gtk.Align.CENTER)
@@ -341,7 +441,7 @@ class SentientPillWindow(Gtk.Window):
         self.typing_box.set_margin_top(8)
         self.typing_box.set_margin_bottom(8)
 
-        # Top Bar: Mascot + "Sidekick" + Open in Full Conversation (arrow.up.forward.app) + Send
+        # Top Bar: Mascot + "Sidekick" + Send (no expand/collapse buttons)
         top_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
         mascot = LivingMascot(size=16, low_power=self.low_power, reduced_motion=self.reduced_motion)
         top_row.append(mascot)
@@ -351,13 +451,6 @@ class SentientPillWindow(Gtk.Window):
         title.set_hexpand(True)
         title.set_xalign(0.0)
         top_row.append(title)
-
-        # Upstream arrow.up.forward.app: Explicit action to open full conversation
-        open_btn = Gtk.Button(label="⇱")
-        open_btn.add_css_class("notch-icon-btn")
-        open_btn.set_tooltip_text("Open conversation in Sentient")
-        open_btn.connect("clicked", lambda _: self.expand(draft=self.typing_entry.get_text()))
-        top_row.append(open_btn)
 
         self.typing_send_btn = Gtk.Button(label="↑")
         self.typing_send_btn.add_css_class("notch-send-pill")
@@ -373,6 +466,7 @@ class SentientPillWindow(Gtk.Window):
         self.typing_entry.add_css_class("notch-typing-entry")
         self.typing_entry.connect("changed", self._on_typing_changed)
         self.typing_entry.connect("activate", lambda _: self._on_typing_submit())
+        self.typing_entry.connect("notify::has-focus", self._on_entry_focus_changed)
         self.typing_box.append(self.typing_entry)
 
         self.pill_stack.add_named(self.typing_box, "typing")
@@ -388,7 +482,7 @@ class SentientPillWindow(Gtk.Window):
         self.running_box.set_margin_top(8)
         self.running_box.set_margin_bottom(8)
 
-        # Top row: Logo + Sidekick indicator + Open in Full + STOP
+        # Top row: Logo + Sidekick indicator + STOP (no expand buttons)
         top_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
         self.running_mascot = LivingMascot(size=16, low_power=self.low_power, reduced_motion=self.reduced_motion)
         self.running_mascot.set_state(MascotState.THINKING)
@@ -399,12 +493,6 @@ class SentientPillWindow(Gtk.Window):
         run_title.set_hexpand(True)
         run_title.set_xalign(0.0)
         top_row.append(run_title)
-
-        open_btn = Gtk.Button(label="⇱")
-        open_btn.add_css_class("notch-icon-btn")
-        open_btn.set_tooltip_text("Open conversation in Sentient")
-        open_btn.connect("clicked", lambda _: self.expand())
-        top_row.append(open_btn)
 
         stop_btn = Gtk.Button(label="■")
         stop_btn.add_css_class("sidekick-stop-btn")
@@ -435,7 +523,7 @@ class SentientPillWindow(Gtk.Window):
         self.message_box.set_margin_top(8)
         self.message_box.set_margin_bottom(10)
 
-        # Header: Mascot + Title + Timestamp + Open in Full + Close
+        # Header: Mascot + Title + Timestamp + Close
         hdr = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
         msg_mascot = LivingMascot(size=14, low_power=self.low_power, reduced_motion=self.reduced_motion)
         hdr.append(msg_mascot)
@@ -449,12 +537,6 @@ class SentientPillWindow(Gtk.Window):
         self.msg_time_lbl.set_hexpand(True)
         self.msg_time_lbl.set_xalign(0.0)
         hdr.append(self.msg_time_lbl)
-
-        open_btn = Gtk.Button(label="⇱")
-        open_btn.add_css_class("notch-icon-btn")
-        open_btn.set_tooltip_text("Open conversation in Sentient")
-        open_btn.connect("clicked", lambda _: self.expand())
-        hdr.append(open_btn)
 
         close_btn = Gtk.Button(label="✕")
         close_btn.add_css_class("notch-icon-btn")
@@ -480,7 +562,7 @@ class SentientPillWindow(Gtk.Window):
         scroller.set_child(self.message_text_label)
         self.message_box.append(scroller)
 
-        # Reply row (capsule with input and send button) + Open in Sentient footer link
+        # Reply row (capsule with input and send button)
         reply_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
 
         reply_capsule = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
@@ -492,6 +574,7 @@ class SentientPillWindow(Gtk.Window):
         self.reply_entry.add_css_class("notch-reply-entry")
         self.reply_entry.set_hexpand(True)
         self.reply_entry.connect("activate", lambda _: self._on_inline_reply_submit())
+        self.reply_entry.connect("notify::has-focus", self._on_entry_focus_changed)
         reply_capsule.append(self.reply_entry)
 
         send_reply_btn = Gtk.Button(label="↑")
@@ -499,12 +582,6 @@ class SentientPillWindow(Gtk.Window):
         send_reply_btn.connect("clicked", lambda _: self._on_inline_reply_submit())
         reply_capsule.append(send_reply_btn)
         reply_row.append(reply_capsule)
-
-        footer_open_btn = Gtk.Button(label="Open ↗")
-        footer_open_btn.add_css_class("notch-action-btn")
-        footer_open_btn.set_tooltip_text("Open full conversation")
-        footer_open_btn.connect("clicked", lambda _: self.expand())
-        reply_row.append(footer_open_btn)
 
         self.message_box.append(reply_row)
 
@@ -569,6 +646,8 @@ class SentientPillWindow(Gtk.Window):
     def _on_typing_changed(self, entry: Gtk.Entry) -> None:
         text = entry.get_text().strip()
         self.typing_send_btn.set_sensitive(bool(text))
+        if not text and not self._is_pointer_inside and not entry.has_focus():
+            self._maybe_schedule_collapse()
 
     def _on_typing_submit(self) -> None:
         prompt = self.typing_entry.get_text().strip()
@@ -724,9 +803,11 @@ class SentientPillWindow(Gtk.Window):
                 self.collapse()
                 return True
             elif self.phase == NotchPhase.TYPING:
+                self.typing_entry.set_text("")
                 self.set_phase(NotchPhase.HIDDEN)
                 return True
             elif self.phase == NotchPhase.MESSAGE:
+                self.reply_entry.set_text("")
                 self.set_phase(NotchPhase.HIDDEN)
                 return True
         return False
