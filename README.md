@@ -85,6 +85,8 @@ pytest -v -s
 
 ## Documentation
 
+- [Upstream Visual Asset & Token Inventory](docs/upstream_asset_inventory.md)
+- [UI Fidelity & Linux Adaptation Comparison](docs/ui_fidelity_comparison.md)
 - [Official Visual Audit & Design Tokens](docs/official_visual_audit.md)
 - [UI Rendering Decision Specification](docs/ui_rendering_decision.md)
 - [MACL Living Intelligence Specification](docs/living_intelligence.md)
