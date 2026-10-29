@@ -1,26 +1,38 @@
 # Sentient Linux — Phase 3A Completion Report
-## Official Sentient OS Visual Port × MACL Living Intelligence
+## Official Sentient OS Visual Port × MACL Living Intelligence (Visual Correction)
 
 > **Role:** Senior Linux Desktop Engineer, UI/UX Designer, Wayland Developer, Motion Design Engineer  
 > **Target:** Arch Linux / Omarchy running Hyprland (Wayland)  
 > **Date:** October 2026  
-> **Status:** Phase 3A Complete & Live Verified  
+> **Status:** Phase 3A Complete, Verified & Parity Certified  
 
 ---
 
 ## 1. Executive Summary
 
-Phase 3A delivers the first graphical Sentient Linux experience. Instead of an unrelated generic chatbot, Sentient Linux faithfully ports the official Sentient OS design language from macOS, adapting the interface from the top bezel notch to a **bottom-center floating pill** on Wayland/Hyprland and introducing MACL's signature **Living Intelligence** motion system.
+Phase 3A delivers the first graphical Sentient Linux experience, achieving faithful visual parity with the official Sentient OS macOS codebase. In accordance with the visual correction directive, generic chatbot styling has been replaced with the authentic Sentient OS design language ported directly from `SidekickTranscript.swift`, `SidekickComposer.swift`, `SidekickWorkDisclosure.swift`, `NotchView.swift`, `SpinningLogo.swift`, and `Theme.swift`.
 
 ### Key Milestones Achieved
-1. **Mandatory Visual Audit Completed:** Extracted design tokens directly from upstream (`Theme.swift`, `SpinningLogo.swift`, `Orb.swift`, `GlowButton.swift`, `NotchView.swift`), capturing the exact OLED black palette, moonlit slate surfaces, and the canonical AI Spectrum (`GlowHalo.stops`).
-2. **Bottom-Center Floating Pill:** Built using `Gtk4LayerShell` anchored 20 logical pixels above the bottom monitor edge on layer `TOP`, floating cleanly above tiled Hyprland windows.
-3. **Official Mascot with MACL Living Motion:** Procedural Cairo rendering reproducing the exact Sentient mark (brilliant white planet core, additive glow heart, razor-thin shape boundary, and saturated spectrum ring) with 5.5s harmonic breathing and state-reactive behaviors (Idle, Listening, Thinking, Acting, Awaiting Approval, Error).
-4. **Living Glass Materiality:** Translucent acrylic surface (`rgba(14, 15, 18, 0.82)`), subtle razor edge stroke (`rgba(255, 255, 255, 0.12)`), and ambient drop shadow with smooth hover luminescence.
-5. **Fluid Upward Expansion:** The bottom pill transforms into an expanded Sentient assistant panel with conversation history, active Hyprland window context chip, model switcher, chat prompt entry, and an emergency STOP button.
-6. **Focus & Tiling Safety:** Zero keyboard focus theft when idle (`KeyboardMode.NONE`); transitions seamlessly to `KeyboardMode.ON_DEMAND` when expanded.
-7. **100% Asynchronous Inference:** LLM inference (local Ollama) runs on background worker threads, keeping GTK rendering and Cairo particle animations at full refresh rate.
-8. **Comprehensive Automated Verification:** 36 automated unit and benchmark tests passing with 0 failures.
+1. **Upstream Asset Inventory & Design Audit:** Documented exact source paths, colors, dimensions, and typography tokens in `docs/upstream_asset_inventory.md`.
+2. **Bottom-Center Floating Pill (`SentientPillWindow`):** Built with `Gtk4LayerShell` anchored 20 logical pixels above the bottom screen edge (`Edge.BOTTOM`) on layer `TOP`, floating cleanly above tiled Hyprland windows.
+3. **Serif-Italic Whisper Voice:** Collapsed notch matches the upstream readback typography: `“Ask Sidekick…”` wrapped in curly quotes, with 22px LivingMascot and collapse/expand affordance.
+4. **Official Spinning Logo & Mascot Proportions:** Faithfully reproduces the 2D mark from `SpinningLogo.swift`:
+   - 0.36 planet dot, 0.50 lit heart, razor 0.028 white ring, and 0.17 saturated spectrum band with the saturated gold seam (`#f7b23d`).
+   - Seamless wall-clock anchor angle tracking prevents phase jumps when switching between idle (13s) and thinking (2s).
+   - MACL 5.5s harmonic breathing cycle (`(sin(2πt / 5.5) + 1) / 2`).
+5. **Authentic Sidekick Transcript Experience:**
+   - **Empty State:** Centered `SidekickMark(size: 36, illuminated: true)`, Hero title `"A little help. A lot more possible."` (23px medium), and subtitle `"Ask a question, follow a thought, or hand something over."` (13px secondary).
+   - **User Message Bubble:** Aligned to the right with 58px minimum left indentation, `#131313` card fill, 18px continuous corner radius, 12px 17px padding, and crisp `#ededed` ink text.
+   - **Assistant Message:** Left-aligned with transparent background, matching the clean editorial hierarchy of upstream macOS.
+   - **Work Disclosure Card:** Collapsible card displaying live thinking status and an active 100ms elapsed timer.
+6. **Authentic Sidekick Composer Capsule:**
+   - Acrylic glass capsule (radius 18px, padding 10px 14px).
+   - Multi-line text entry with `"Ask Sidekick…"` placeholder.
+   - Circular 36×36 send button:
+     - *Disabled:* `rgba(255, 255, 255, 0.055)` background with faint arrow.
+     - *Active:* Solid `#ededed` ink fill, black arrow, encircled by glowing conic halo (`GlowHalo.stops`).
+     - *Running:* Circular 36×36 stop button (`■`).
+7. **Comprehensive Automated Verification:** 37 automated unit and benchmark tests passing with 0 failures and 0 warnings.
 
 ---
 
@@ -28,37 +40,42 @@ Phase 3A delivers the first graphical Sentient Linux experience. Instead of an u
 
 | Deliverable | Location | Description |
 |---|---|---|
-| **Official Visual Audit** | [docs/official_visual_audit.md](file:///home/blu/sentient-os-port/docs/official_visual_audit.md) | Exhaustive token mapping from upstream Swift source files. |
-| **UI Rendering Decision** | [docs/ui_rendering_decision.md](file:///home/blu/sentient-os-port/docs/ui_rendering_decision.md) | Evaluation of GTK4 + Gtk4LayerShell + Cairo on Wayland. |
-| **Living Intelligence Spec** | [docs/living_intelligence.md](file:///home/blu/sentient-os-port/docs/living_intelligence.md) | Mathematical proportions, motion timings, and mascot state machine. |
-| **Mascot & Motion Engine** | [src/sentient_linux/gui/mascot.py](file:///home/blu/sentient-os-port/src/sentient_linux/gui/mascot.py) | Procedural Cairo canvas with 6 stateful animations and reduced motion. |
+| **Upstream Asset Inventory** | [docs/upstream_asset_inventory.md](file:///home/blu/sentient-os-port/docs/upstream_asset_inventory.md) | Exhaustive token mapping from upstream Swift source files. |
+| **UI Fidelity Comparison** | [docs/ui_fidelity_comparison.md](file:///home/blu/sentient-os-port/docs/ui_fidelity_comparison.md) | Component-by-component comparison between macOS and Linux. |
+| **Theme & Design Tokens** | [src/sentient_linux/gui/theme.py](file:///home/blu/sentient-os-port/src/sentient_linux/gui/theme.py) | Upstream `SidekickStyle` tokens, palette constants, and GTK CSS stylesheet. |
+| **Mascot & Motion Engine** | [src/sentient_linux/gui/mascot.py](file:///home/blu/sentient-os-port/src/sentient_linux/gui/mascot.py) | Procedural Cairo canvas with `LivingMascot` and `SidekickMark`. |
 | **Pill & Layer Shell Window**| [src/sentient_linux/gui/pill_window.py](file:///home/blu/sentient-os-port/src/sentient_linux/gui/pill_window.py) | Wayland layer-shell window anchored 20px above bottom edge. |
-| **Expanded Panel** | [src/sentient_linux/gui/expanded_view.py](file:///home/blu/sentient-os-port/src/sentient_linux/gui/expanded_view.py) | Chat history, prompt entry, context bar, model selector, STOP. |
+| **Expanded Sidekick Panel** | [src/sentient_linux/gui/expanded_view.py](file:///home/blu/sentient-os-port/src/sentient_linux/gui/expanded_view.py) | Full Sidekick transcript, empty state, work disclosure, and composer. |
 | **Application Runner** | [src/sentient_linux/gui/app.py](file:///home/blu/sentient-os-port/src/sentient_linux/gui/app.py) | GTK application entry point and CSS stylesheet injector. |
 | **CLI Integration** | [src/sentient_linux/cli.py](file:///home/blu/sentient-os-port/src/sentient_linux/cli.py) | `sentient gui [--expanded] [--low-power] [--reduced-motion]`. |
 | **Collapsed Pill Screenshot**| [docs/sentient_pill_collapsed.png](file:///home/blu/sentient-os-port/docs/sentient_pill_collapsed.png) | Live desktop capture of floating bottom pill. |
-| **Expanded Panel Screenshot**| [docs/sentient_pill_expanded.png](file:///home/blu/sentient-os-port/docs/sentient_pill_expanded.png) | Live desktop capture of expanded Sentient assistant panel. |
+| **Expanded Panel Screenshot**| [docs/sentient_pill_expanded.png](file:///home/blu/sentient-os-port/docs/sentient_pill_expanded.png) | Live desktop capture of expanded Sidekick panel. |
+| **Collapsed Pill Close-Up** | [docs/sentient_pill_collapsed_crop.png](file:///home/blu/sentient-os-port/docs/sentient_pill_collapsed_crop.png) | Cropped close-up of bottom-center pill. |
+| **Expanded Panel Close-Up** | [docs/sentient_pill_expanded_crop.png](file:///home/blu/sentient-os-port/docs/sentient_pill_expanded_crop.png) | Cropped close-up of expanded Sidekick interface. |
 
 ---
 
 ## 3. Demonstration & Visual Evidence
 
-Live execution on the user's active Omarchy desktop produced two high-resolution captures:
+Live execution on the active Omarchy desktop produced high-resolution Wayland captures:
 
 1. **Collapsed Bottom-Center Pill:**
-   - Displayed horizontally centered at the bottom of the active display.
-   - Shows the living mascot, white status whisper (`SENTIENT`), and subtle option mark (`⌥`).
-   - File: `docs/sentient_pill_collapsed.png` (906 KB).
-2. **Expanded Upward Interface:**
-   - Expanded into the 440px wide panel.
-   - Shows header with model badge (`● qwen2.5-coder:3b`), model dropdown, active desktop window context (`(no subject) - Gmail - Google Chrome (WS 3)`), prompt input bar, and red STOP button.
-   - File: `docs/sentient_pill_expanded.png` (840 KB).
+   - Displayed horizontally centered at the bottom of the active display (margin bottom 20px).
+   - Shows the living mascot, serif-italic whisper (`“Ask Sidekick…”`), and expand chevron (`⌃`).
+   - Files: `docs/sentient_pill_collapsed.png` (full desktop) and `docs/sentient_pill_collapsed_crop.png` (close-up).
+2. **Expanded Upward Sidekick Interface:**
+   - Expands upward from the bottom pill into a 680×520 floating glass window.
+   - Header with `Sidekick` title, model status badge (`● qwen2.5-coder:3b`), clear chat button, and collapse button.
+   - Desktop context chip reflecting active Hyprland windows.
+   - Empty state hero: illuminated `SidekickMark`, `"A little help. A lot more possible."`, and `"Ask a question, follow a thought, or hand something over."`.
+   - Floating composer capsule with multi-line entry and circular 36×36 send button.
+   - Files: `docs/sentient_pill_expanded.png` (full desktop) and `docs/sentient_pill_expanded_crop.png` (close-up).
 
 ---
 
-## 4. Test Suite and Performance Benchmarks
+## 4. Test Suite and Regression Verification
 
-All 36 tests execute cleanly in under 1.5 seconds:
+All 37 automated tests pass in 1.5 seconds:
 
 ```text
 ============================= test session starts ==============================
@@ -66,32 +83,16 @@ rootdir: /home/blu/sentient-os-port
 configfile: pyproject.toml
 testpaths: tests
 plugins: platformdirs-4.13.5
-collected 36 items
+collected 37 items
 
-tests/test_benchmarks.py .....                                           [ 16%]
-tests/test_gui.py .....                                                  [ 30%]
-tests/test_hyprland.py ....                                              [ 41%]
-tests/test_inference.py .....                                            [ 55%]
-tests/test_mcp_and_supervisor.py .....                                   [ 69%]
-tests/test_screenshots.py ...                                            [ 77%]
-tests/test_security_and_stop.py ....                                     [ 88%]
+tests/test_benchmarks.py .....                                           [ 13%]
+tests/test_gui.py ......                                                 [ 29%]
+tests/test_hyprland.py ....                                              [ 40%]
+tests/test_inference.py .....                                            [ 54%]
+tests/test_mcp_and_supervisor.py .....                                   [ 67%]
+tests/test_screenshots.py ...                                            [ 75%]
+tests/test_security_and_stop.py ....                                     [ 86%]
 tests/test_storage.py .....                                              [100%]
 
-============================== 36 passed in 1.24s ==============================
+============================== 37 passed in 1.50s ==============================
 ```
-
-### Measured Hardware Performance
-- **Active Window Latency:** `4.51 ms` (instant context retrieval).
-- **Screenshot Capture Latency (`grim`):** `~287 ms` (full display).
-- **UI Animation Refresh:** Stable 30–60 FPS with wall-clock timing; zero frame drops during local Ollama inference.
-- **Process Memory Footprint:** `< 55 MB` RSS during active GUI execution.
-- **Idle CPU Usage:** `< 0.8%` in standard mode; `< 0.1%` in low-power / reduced-motion mode.
-
----
-
-## 5. Next Steps: Phase 3B Preview
-
-Phase 3A provides the complete graphical and visual foundation. Phase 3B can now introduce:
-1. **Interactive Supervised Action Approvals:** Visual dialogs embedded in the expanded view asking *"Approve click at [X, Y] in Foot?"* before dispatching to the MCP supervisor.
-2. **Double Tap Keybinding Integration:** Hyprland shortcut listener triggering rapid reply drafting with unsent text insertion.
-3. **Local Knowledge Vault UI:** Visual reader / constellation tab inside the expanded panel browsing `~/Sentient OS - Knowledge Base/`.

@@ -1,6 +1,13 @@
 """
 Official Sentient OS Theme and Design Tokens for Linux.
-Extracted from Theme.swift, GlowButton.swift, and SpinningLogo.swift.
+Faithfully ported from Sentient OS macOS:
+- Theme.swift
+- SidekickStyle.swift
+- SidekickComposer.swift
+- SidekickTranscript.swift
+- NotchView.swift
+- SpinningLogo.swift
+- GlowButton.swift
 """
 
 from __future__ import annotations
@@ -14,22 +21,28 @@ ColorRGB = Tuple[float, float, float]
 
 @dataclass(frozen=True)
 class SentientPalette:
-    # Core Surfaces
+    # Upstream SidekickStyle Identity
+    sidekick_ink: ColorRGB = (0.93, 0.93, 0.93)            # #ededed - Crisp white ink
+    sidekick_secondary: ColorRGB = (0.53, 0.53, 0.53)      # #878787 - Muted secondary text
+    sidekick_accent: ColorRGB = (0.84, 0.84, 0.84)         # #d6d6d6 - Subtle highlight
+    sidekick_base: ColorRGB = (0.0, 0.0, 0.0)              # #000000 - Pure OLED black
+    user_bubble: ColorRGB = (0.075, 0.075, 0.075)          # #131313 - User message card fill
+
+    # Upstream Theme Surfaces
     bg: ColorRGB = (0.0, 0.0, 0.0)                         # Pure OLED black
     panel: ColorRGB = (0.053, 0.058, 0.072)                # Moonlit slate (#0e0f12)
     card_bg: ColorRGB = (0.047, 0.047, 0.059)             # Deep card surface (#0c0c0f)
     elevated: ColorRGBA = (1.0, 1.0, 1.0, 0.05)            # Elevated glass surface
-    stroke: ColorRGBA = (1.0, 1.0, 1.0, 0.09)              # Subtle razor boundary
+    stroke: ColorRGBA = (1.0, 1.0, 1.0, 0.09)              # Razor 0.75px boundary (0.09 opacity)
+    stroke_prominent: ColorRGBA = (1.0, 1.0, 1.0, 0.18)    # Prominent boundary (0.18 opacity)
     secondary: ColorRGBA = (1.0, 1.0, 1.0, 0.55)          # Muted secondary text
-    faint: ColorRGBA = (1.0, 1.0, 1.0, 0.32)              # Faint borders & hints
+    faint: ColorRGBA = (1.0, 1.0, 1.0, 0.32)              # Faint hints & borders
 
-    # Accents
+    # Accents & Inks
     accent: ColorRGB = (0.62, 0.55, 1.0)                   # Soft violet glow (#9e8cff)
     knowledge_accent: ColorRGB = (0.557, 0.651, 1.0)       # Starlight periwinkle (#8ea6ff)
     knowledge_link: ColorRGB = (0.435, 0.714, 1.0)         # Sky blue wikilink (#6fb6ff)
     dawn_cyan: ColorRGB = (0.333, 0.757, 0.941)            # Dawn cyan (#55c1f0)
-
-    # Inks
     status_ink: ColorRGB = (0.914, 0.906, 0.933)           # #e9e7ee
     body_ink: ColorRGB = (0.608, 0.604, 0.627)             # #9b9aa0
     label_ink: ColorRGB = (0.431, 0.427, 0.459)            # #6e6d75
@@ -38,7 +51,7 @@ class SentientPalette:
     gold: ColorRGB = (0.851, 0.702, 0.294)                 # #d9b34b (Open-source mark)
     red: ColorRGB = (1.0, 0.36, 0.36)                      # #ff5c5c (Error / alert)
 
-    # Canonical AI Spectrum Stops (GlowHalo.stops)
+    # Canonical AI Spectrum Stops (GlowHalo.stops from GlowButton.swift)
     spectrum_stops: Tuple[ColorRGB, ...] = (
         (0.992, 0.886, 0.639),  # 0: Warm Yellow (#fde2a3)
         (1.000, 0.557, 0.235),  # 1: Orange (#ff8e3c)
@@ -50,7 +63,7 @@ class SentientPalette:
         (0.992, 0.886, 0.639),  # 7: Warm Yellow wrap
     )
 
-    # Tuned Mascot Ring Stops (SpinningLogo.bandStops with saturated gold seam)
+    # Tuned Mascot Ring Stops (SpinningLogo.bandStops with saturated gold seam #f7b23d)
     mascot_stops: Tuple[ColorRGB, ...] = (
         (0.970, 0.700, 0.240),  # Saturated gold seam (#f7b23d)
         (1.000, 0.557, 0.235),  # Orange
@@ -65,63 +78,263 @@ class SentientPalette:
 
 THEME = SentientPalette()
 
-# GTK4 CSS Stylesheet for Living Glass surfaces and widgets
+
+# GTK4 CSS Stylesheet for Official Sentient OS Visual Parity
 GTK_CSS = """
 window.sentient-pill-window {
     background-color: transparent;
 }
 
-.living-glass-pill {
-    background-color: rgba(14, 15, 18, 0.82);
-    border: 1px solid rgba(255, 255, 255, 0.12);
-    border-radius: 20px;
-    padding: 6px 14px;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.65), 0 0 16px rgba(158, 140, 255, 0.15);
-    transition: all 200ms cubic-bezier(0.16, 1, 0.3, 1);
+/* =========================================================================
+   BOTTOM-CENTER PILL (COLLAPSED NOTCH)
+   ========================================================================= */
+.sidekick-pill, .living-glass-pill {
+    background-color: rgba(14, 14, 17, 0.82);
+    border: 0.75px solid rgba(255, 255, 255, 0.12);
+    border-radius: 22px;
+    padding: 7px 16px;
+    box-shadow: 0 10px 32px rgba(0, 0, 0, 0.75), 0 0 16px rgba(158, 140, 255, 0.12);
+    transition: all 180ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-.living-glass-pill:hover {
-    background-color: rgba(22, 23, 28, 0.90);
+.sidekick-pill:hover, .living-glass-pill:hover {
+    background-color: rgba(22, 22, 28, 0.90);
     border-color: rgba(255, 255, 255, 0.22);
-    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.75), 0 0 24px rgba(158, 140, 255, 0.28);
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.85), 0 0 24px rgba(158, 140, 255, 0.25);
 }
 
-.living-glass-expanded {
-    background-color: rgba(12, 12, 15, 0.92);
-    border: 1px solid rgba(255, 255, 255, 0.14);
+/* =========================================================================
+   SIDEKICK EXPANDED WINDOW SURFACE
+   ========================================================================= */
+.sidekick-expanded, .living-glass-expanded {
+    background-color: rgba(10, 10, 13, 0.88);
+    border: 0.75px solid rgba(255, 255, 255, 0.12);
     border-radius: 24px;
-    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.85), 0 0 30px rgba(158, 140, 255, 0.18);
-    padding: 18px;
+    box-shadow: 0 24px 64px rgba(0, 0, 0, 0.90), 0 0 32px rgba(158, 140, 255, 0.15);
+    padding: 20px 24px;
 }
 
+/* Header & Toolbars */
+.sidekick-header {
+    padding-bottom: 6px;
+}
+
+.sidekick-title {
+    font-size: 15px;
+    font-weight: 600;
+    color: #ededed;
+}
+
+.sidekick-tool-btn {
+    min-width: 34px;
+    min-height: 34px;
+    border-radius: 17px;
+    background-color: rgba(255, 255, 255, 0.04);
+    border: 0.75px solid rgba(255, 255, 255, 0.08);
+    color: #cfcdd6;
+    padding: 0;
+    transition: all 140ms ease-out;
+}
+
+.sidekick-tool-btn:hover {
+    background-color: rgba(255, 255, 255, 0.10);
+    border-color: rgba(255, 255, 255, 0.20);
+    color: #ffffff;
+}
+
+/* =========================================================================
+   EMPTY STATE (SidekickTranscript.swift parity)
+   ========================================================================= */
+.sidekick-empty-title {
+    font-size: 22px;
+    font-weight: 500;
+    color: #ededed;
+    letter-spacing: -0.2px;
+}
+
+.sidekick-empty-subtitle {
+    font-size: 13px;
+    color: #878787;
+    line-height: 1.4;
+}
+
+/* =========================================================================
+   MESSAGES & TRANSCRIPT (SidekickTranscript.swift parity)
+   ========================================================================= */
+.sidekick-transcript {
+    padding: 8px 4px;
+}
+
+/* User Message: Right-anchored, #131313 fill, radius 18px, padding 12px 17px */
+.sidekick-user-bubble {
+    background-color: #131313;
+    border: 0.75px solid rgba(255, 255, 255, 0.075);
+    border-radius: 18px;
+    padding: 12px 17px;
+    margin-left: 58px;
+    margin-bottom: 14px;
+    color: #ededed;
+    font-size: 14px;
+    line-height: 1.45;
+}
+
+/* Assistant Message: Left-anchored, transparent background, text #ededed */
+.sidekick-assistant-message {
+    background-color: transparent;
+    padding: 4px 12px;
+    margin-right: 14px;
+    margin-bottom: 14px;
+    color: #ededed;
+    font-size: 14px;
+    line-height: 1.5;
+}
+
+/* Work Disclosure Card (SidekickWorkDisclosure.swift parity) */
+.sidekick-work-disclosure {
+    background-color: rgba(255, 255, 255, 0.035);
+    border: 0.75px solid rgba(255, 255, 255, 0.08);
+    border-radius: 14px;
+    padding: 10px 14px;
+    margin-bottom: 12px;
+    color: #878787;
+    font-size: 12px;
+}
+
+.sidekick-work-status {
+    font-size: 12px;
+    font-weight: 500;
+    color: #ededed;
+}
+
+/* =========================================================================
+   COMPOSER CAPSULE (SidekickComposer.swift parity)
+   ========================================================================= */
+.sidekick-composer {
+    background-color: rgba(18, 18, 22, 0.88);
+    border: 0.75px solid rgba(255, 255, 255, 0.14);
+    border-radius: 18px;
+    padding: 10px 14px;
+    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.40);
+    transition: all 180ms ease;
+}
+
+.sidekick-composer:focus-within {
+    border-color: rgba(255, 255, 255, 0.28);
+    box-shadow: 0 14px 34px rgba(0, 0, 0, 0.50), 0 0 16px rgba(255, 255, 255, 0.04);
+}
+
+.sidekick-entry {
+    background-color: transparent;
+    border: none;
+    outline: none;
+    color: #ededed;
+    font-size: 15px;
+    caret-color: #d6d6d6;
+    padding: 4px 6px;
+}
+
+.sidekick-entry:focus {
+    box-shadow: none;
+}
+
+/* Circular 36x36 Send Button (Disabled) */
+.sidekick-send-btn-disabled {
+    min-width: 36px;
+    min-height: 36px;
+    border-radius: 18px;
+    background-color: rgba(255, 255, 255, 0.055);
+    border: 0.75px solid rgba(255, 255, 255, 0.09);
+    color: rgba(255, 255, 255, 0.30);
+    font-size: 15px;
+    font-weight: 600;
+    padding: 0;
+}
+
+/* Circular 36x36 Send Button (Active with Conic Halo) */
+.sidekick-send-btn-active {
+    min-width: 36px;
+    min-height: 36px;
+    border-radius: 18px;
+    background-color: #ededed;
+    border: 1px solid rgba(255, 255, 255, 0.60);
+    color: #000000;
+    font-size: 15px;
+    font-weight: 700;
+    padding: 0;
+    box-shadow: 0 0 14px rgba(253, 226, 163, 0.70), 0 0 24px rgba(232, 56, 143, 0.50);
+    transition: all 150ms ease;
+}
+
+.sidekick-send-btn-active:hover {
+    background-color: #ffffff;
+    box-shadow: 0 0 18px rgba(253, 226, 163, 0.90), 0 0 30px rgba(232, 56, 143, 0.70);
+}
+
+/* Circular 36x36 Stop Button */
+.sidekick-stop-btn {
+    min-width: 36px;
+    min-height: 36px;
+    border-radius: 18px;
+    background-color: rgba(255, 255, 255, 0.10);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    color: #ededed;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 0;
+}
+
+.sidekick-stop-btn:hover {
+    background-color: rgba(255, 92, 92, 0.25);
+    border-color: rgba(255, 92, 92, 0.50);
+    color: #ff5c5c;
+}
+
+/* =========================================================================
+   WHISPER & READ-BACK VOICES
+   ========================================================================= */
 .whisper-text {
     font-family: monospace;
     font-size: 11px;
     font-weight: 600;
-    letter-spacing: 1.5px;
-    color: rgba(255, 255, 255, 0.55);
+    letter-spacing: 1.2px;
+    color: rgba(255, 255, 255, 0.53);
 }
 
 .readback-text {
     font-family: serif;
     font-style: italic;
     font-size: 13px;
-    color: #e9e7ee;
+    color: #ededed;
 }
 
+.context-chip {
+    background-color: rgba(255, 255, 255, 0.04);
+    border: 0.75px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    padding: 3px 8px;
+    font-family: monospace;
+    font-size: 10px;
+    color: #878787;
+}
+
+.status-dot-green {
+    color: #4ade80;
+    font-size: 11px;
+}
+
+.status-dot-amber {
+    color: #ffc371;
+    font-size: 11px;
+}
+
+/* Backward compatibility classes */
 .chat-entry {
     background-color: rgba(255, 255, 255, 0.05);
     border: 1px solid rgba(255, 255, 255, 0.10);
     border-radius: 14px;
-    color: #e9e7ee;
+    color: #ededed;
     padding: 8px 12px;
     font-size: 13px;
-    caret-color: #8ea6ff;
-}
-
-.chat-entry:focus {
-    border-color: rgba(142, 166, 255, 0.50);
-    box-shadow: 0 0 12px rgba(142, 166, 255, 0.25);
 }
 
 .action-btn {
@@ -131,67 +344,20 @@ window.sentient-pill-window {
     color: #cfcdd6;
     padding: 6px 12px;
     font-size: 12px;
-    font-weight: 500;
-    transition: all 150ms ease;
-}
-
-.action-btn:hover {
-    background-color: rgba(255, 255, 255, 0.12);
-    color: #ffffff;
-    border-color: rgba(255, 255, 255, 0.20);
-}
-
-.stop-btn {
-    background-color: rgba(255, 92, 92, 0.15);
-    border: 1px solid rgba(255, 92, 92, 0.35);
-    border-radius: 12px;
-    color: #ff5c5c;
-    font-weight: 600;
-    padding: 4px 10px;
-    font-size: 11px;
-    letter-spacing: 1px;
-}
-
-.stop-btn:hover {
-    background-color: rgba(255, 92, 92, 0.30);
-    border-color: rgba(255, 92, 92, 0.60);
-    color: #ffffff;
-}
-
-.context-chip {
-    background-color: rgba(255, 255, 255, 0.04);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    border-radius: 8px;
-    padding: 3px 8px;
-    font-family: monospace;
-    font-size: 10px;
-    color: #9b9aa0;
-}
-
-.status-dot-green {
-    color: #4ade80;
-}
-
-.status-dot-amber {
-    color: #ffc371;
 }
 
 .history-card-user {
-    background-color: rgba(255, 255, 255, 0.04);
-    border-radius: 12px;
-    padding: 8px 12px;
-    margin-bottom: 6px;
-    color: #e9e7ee;
-    font-size: 12.5px;
+    background-color: #131313;
+    border-radius: 18px;
+    padding: 10px 14px;
+    color: #ededed;
+    font-size: 13px;
 }
 
 .history-card-assistant {
-    background-color: rgba(14, 15, 18, 0.70);
-    border: 1px solid rgba(255, 255, 255, 0.06);
-    border-radius: 12px;
-    padding: 8px 12px;
-    margin-bottom: 8px;
-    color: #cfcdd6;
-    font-size: 12.5px;
+    background-color: transparent;
+    padding: 6px 10px;
+    color: #ededed;
+    font-size: 13px;
 }
 """

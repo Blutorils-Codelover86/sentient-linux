@@ -1,6 +1,7 @@
 """
 Bottom-center floating Sentient Pill window for Wayland / Hyprland.
 Uses Gtk4LayerShell to anchor 20px above the bottom screen edge without stealing focus.
+Faithful port of NotchView.swift and SidekickPresentation.swift to Wayland.
 """
 
 from __future__ import annotations
@@ -35,14 +36,14 @@ logger = logging.getLogger("sentient.gui.pill_window")
 class SentientPillWindow(Gtk.Window):
     """
     Floating bottom-center Wayland Layer-Shell window.
-    States:
-    - Collapsed: Small floating glass pill with living mascot and status whisper.
-    - Expanded: Fluid upward expansion into full Sentient assistant panel.
+    Faithful port of Sentient OS Notch & Sidekick interface:
+    - Collapsed: Bottom-center glass pill with LivingMascot, serif-italic read-back / status whisper.
+    - Expanded: Fluid upward expansion into full Sidekick conversation panel.
     """
 
-    COLLAPSED_WIDTH = 240
-    COLLAPSED_HEIGHT = 46
-    EXPANDED_WIDTH = 440
+    COLLAPSED_WIDTH = 340
+    COLLAPSED_HEIGHT = 44
+    EXPANDED_WIDTH = 680
     EXPANDED_HEIGHT = 520
 
     def __init__(
@@ -66,7 +67,7 @@ class SentientPillWindow(Gtk.Window):
         # 1. Initialize Wayland Layer Shell
         self._init_layer_shell()
 
-        # 2. Main Stack / Root Container
+        # 2. Main Container
         self.root_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
         self.set_child(self.root_box)
 
@@ -106,27 +107,27 @@ class SentientPillWindow(Gtk.Window):
         Gtk4LayerShell.set_keyboard_mode(self, Gtk4LayerShell.KeyboardMode.NONE)
 
     def _build_collapsed_pill(self) -> None:
-        self.pill_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
-        self.pill_box.add_css_class("living-glass-pill")
+        self.pill_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
+        self.pill_box.add_css_class("sidekick-pill")
         self.pill_box.set_size_request(self.COLLAPSED_WIDTH, self.COLLAPSED_HEIGHT)
 
-        # Living Mascot
+        # Living Mascot (22px)
         self.pill_mascot = LivingMascot(
-            size=26,
+            size=22,
             low_power=self.low_power,
             reduced_motion=self.reduced_motion,
         )
         self.pill_box.append(self.pill_mascot)
 
-        # Status Whisper
-        self.pill_label = Gtk.Label(label="SENTIENT")
-        self.pill_label.add_css_class("whisper-text")
+        # Upstream Notch Caption: Serif-italic whisper voice ("“Ask Sidekick…”")
+        self.pill_label = Gtk.Label(label="“Ask Sidekick…”")
+        self.pill_label.add_css_class("readback-text")
         self.pill_label.set_hexpand(True)
-        self.pill_label.set_xalign(0.1)
+        self.pill_label.set_xalign(0.0)
         self.pill_box.append(self.pill_label)
 
-        # Right affordance glyph
-        right_glyph = Gtk.Label(label="⌥")
+        # Right affordance hint (Super+K / Upward expand glyph)
+        right_glyph = Gtk.Label(label="⌃")
         right_glyph.add_css_class("whisper-text")
         self.pill_box.append(right_glyph)
 
