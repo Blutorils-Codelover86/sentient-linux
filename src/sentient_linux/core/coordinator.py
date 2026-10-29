@@ -72,6 +72,20 @@ class CommandCoordinator:
     def list_models(self) -> list[str]:
         return self.inference.list_available_models()
 
+    def run_task(
+        self,
+        prompt: str,
+        include_context: bool = True,
+        include_screenshot: bool = False,
+    ) -> Any:
+        """Execute a task instruction with desktop context perception."""
+        summary = self.ask(
+            prompt=prompt,
+            include_context=include_context,
+            include_screenshot=include_screenshot,
+        )
+        return type("TaskResult", (), {"summary": summary})()
+
     def _set_state(self, new_state: SentientState) -> None:
         old_state = self.state_machine.current_state
         self.state_machine.transition_to(new_state)

@@ -96,7 +96,8 @@ window.sentient-pill-window {
 }
 
 .bottom-notch-content {
-    padding: 4px 22px 6px 22px;
+    padding: 0 16px;
+    min-height: 40px;
 }
 
 /* =========================================================================

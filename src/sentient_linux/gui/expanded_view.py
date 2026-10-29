@@ -350,8 +350,11 @@ class ExpandedView(Gtk.Box):
     def _execute_prompt(self, prompt: str) -> None:
         try:
             GLib.idle_add(self._update_work_status, "Consulting desktop context & reasoning…")
-            res = self.coordinator.run_task(prompt)
-            output = res.summary if res else "Response ready."
+            if hasattr(self.coordinator, "run_task"):
+                res = self.coordinator.run_task(prompt)
+                output = res.summary if hasattr(res, "summary") else str(res)
+            else:
+                output = self.coordinator.ask(prompt=prompt, include_context=True)
             GLib.idle_add(self._finish_running, True, output)
         except Exception as err:
             GLib.idle_add(self._finish_running, False, f"Inference error: {err}")

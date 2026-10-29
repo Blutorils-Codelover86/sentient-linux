@@ -28,7 +28,8 @@ gi.require_version("Gtk", "4.0")
 gi.require_version("Gtk4LayerShell", "1.0")
 gi.require_version("Gdk", "4.0")
 gi.require_version("GLib", "2.0")
-from gi.repository import Gtk, Gdk, Gtk4LayerShell, GLib
+gi.require_version("Pango", "1.0")
+from gi.repository import Gtk, Gdk, Gtk4LayerShell, GLib, Pango
 
 from sentient_linux.core.coordinator import CommandCoordinator
 from sentient_linux.gui.mascot import LivingMascot, MascotState
@@ -95,13 +96,13 @@ class BottomNotchShapeBackground(Gtk.DrawingArea):
             for lw, alpha in [(8.0, 0.25), (4.0, 0.55), (1.5, 0.95)]:
                 cr.save()
                 cr.move_to(0, h)
-                cr.curve_to(s_r * 0.45, h, s_r, h - s_r * 0.45, s_r, h - s_r)
+                cr.curve_to(s_r * 0.55, h, s_r, h - s_r * 0.45, s_r, h - s_r)
                 cr.line_to(s_r, t_r)
                 cr.curve_to(s_r, t_r * 0.45, s_r + t_r * 0.45, 0, s_r + t_r, 0)
                 cr.line_to(w - s_r - t_r, 0)
                 cr.curve_to(w - s_r - t_r * 0.45, 0, w - s_r, t_r * 0.45, w - s_r, t_r)
                 cr.line_to(w - s_r, h - s_r)
-                cr.curve_to(w - s_r, h - s_r * 0.45, w - s_r * 0.45, h, w, h)
+                cr.curve_to(w - s_r, h - s_r * 0.45, w - s_r * 0.55, h, w, h)
 
                 # Rotating angular gradient pattern along the skirt
                 pat = cairo.LinearGradient(0, 0, w, h)
@@ -117,13 +118,13 @@ class BottomNotchShapeBackground(Gtk.DrawingArea):
 
         # 2. Path for solid fill (including flat bottom along the bezel)
         cr.move_to(0, h)
-        cr.curve_to(s_r * 0.45, h, s_r, h - s_r * 0.45, s_r, h - s_r)
+        cr.curve_to(s_r * 0.55, h, s_r, h - s_r * 0.45, s_r, h - s_r)
         cr.line_to(s_r, t_r)
         cr.curve_to(s_r, t_r * 0.45, s_r + t_r * 0.45, 0, s_r + t_r, 0)
         cr.line_to(w - s_r - t_r, 0)
         cr.curve_to(w - s_r - t_r * 0.45, 0, w - s_r, t_r * 0.45, w - s_r, t_r)
         cr.line_to(w - s_r, h - s_r)
-        cr.curve_to(w - s_r, h - s_r * 0.45, w - s_r * 0.45, h, w, h)
+        cr.curve_to(w - s_r, h - s_r * 0.45, w - s_r * 0.55, h, w, h)
         cr.line_to(0, h)
         cr.close_path()
 
@@ -133,15 +134,18 @@ class BottomNotchShapeBackground(Gtk.DrawingArea):
 
         # 3. Open Skirt Path (NotchSkirtShape.swift parity): stroke only visible edges
         cr.move_to(0, h)
-        cr.curve_to(s_r * 0.45, h, s_r, h - s_r * 0.45, s_r, h - s_r)
+        cr.curve_to(s_r * 0.55, h, s_r, h - s_r * 0.45, s_r, h - s_r)
         cr.line_to(s_r, t_r)
         cr.curve_to(s_r, t_r * 0.45, s_r + t_r * 0.45, 0, s_r + t_r, 0)
         cr.line_to(w - s_r - t_r, 0)
         cr.curve_to(w - s_r - t_r * 0.45, 0, w - s_r, t_r * 0.45, w - s_r, t_r)
         cr.line_to(w - s_r, h - s_r)
-        cr.curve_to(w - s_r, h - s_r * 0.45, w - s_r * 0.45, h, w, h)
+        cr.curve_to(w - s_r, h - s_r * 0.45, w - s_r * 0.55, h, w, h)
 
         # Stroke visible razor border (0.75px)
+        cr.set_source_rgba(1.0, 1.0, 1.0, 0.16)
+        cr.set_line_width(0.75)
+        cr.stroke()
         cr.set_source_rgba(1.0, 1.0, 1.0, 0.16)
         cr.set_line_width(0.75)
         cr.stroke()
@@ -156,7 +160,7 @@ class SentientPillWindow(Gtk.Window):
     - Synchronous geometry renegotiation ensures zero stretching across the monitor.
     """
 
-    COLLAPSED_WIDTH = 380
+    COLLAPSED_WIDTH = 340
     COLLAPSED_HEIGHT = 40
     RUNNING_HEIGHT = 56
     EXPANDED_WIDTH = 780
@@ -245,17 +249,20 @@ class SentientPillWindow(Gtk.Window):
         self.pill_overlay.add_css_class("bottom-notch-pill")
 
         # Background drawing with concave fillets curving into the bezel
-        self.notch_bg = BottomNotchShapeBackground(top_radius=16.0, shoulder_radius=12.0)
+        self.notch_bg = BottomNotchShapeBackground(top_radius=14.0, shoulder_radius=10.0)
         self.notch_bg.set_size_request(self.COLLAPSED_WIDTH, self.COLLAPSED_HEIGHT)
         self.pill_overlay.set_child(self.notch_bg)
 
         # Stack container for Idle Row vs Running Row
         self.pill_stack = Gtk.Stack()
         self.pill_stack.set_transition_type(Gtk.StackTransitionType.CROSSFADE)
+        self.pill_stack.set_hhomogeneous(False)
+        self.pill_stack.set_vhomogeneous(False)
 
         # --- View 1: Idle Row ---
-        self.idle_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
+        self.idle_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
         self.idle_box.add_css_class("bottom-notch-content")
+        self.idle_box.set_valign(Gtk.Align.CENTER)
         self.idle_box.set_size_request(self.COLLAPSED_WIDTH, self.COLLAPSED_HEIGHT)
 
         self.pill_mascot = LivingMascot(
@@ -277,8 +284,9 @@ class SentientPillWindow(Gtk.Window):
         self.pill_stack.add_named(self.idle_box, "idle")
 
         # --- View 2: Running Computer-Use Row (NotchView parity) ---
-        self.running_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=3)
+        self.running_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
         self.running_box.add_css_class("bottom-notch-content")
+        self.running_box.set_valign(Gtk.Align.CENTER)
         self.running_box.set_size_request(self.COLLAPSED_WIDTH, self.RUNNING_HEIGHT)
 
         # Top row: Logo + Stop Button
@@ -303,6 +311,8 @@ class SentientPillWindow(Gtk.Window):
         self.status_line = Gtk.Label(label="mcp: sentient_native/click (completed)...")
         self.status_line.add_css_class("whisper-text")
         self.status_line.set_xalign(0.0)
+        self.status_line.set_ellipsize(Pango.EllipsizeMode.END)
+        self.status_line.set_max_width_chars(32)
         self.running_box.append(self.status_line)
 
         self.pill_stack.add_named(self.running_box, "running")
@@ -345,9 +355,9 @@ class SentientPillWindow(Gtk.Window):
 
         # Synchronously hide, swap child, resize, and show to cleanly reallocate surface
         self.set_visible(False)
-        if self.pill_overlay.get_parent() == self.root_box:
-            self.root_box.remove(self.pill_overlay)
-        if self.expanded_view.get_parent() != self.root_box:
+        if self.pill_overlay.get_parent() is not None:
+            self.pill_overlay.get_parent().remove(self.pill_overlay)
+        if self.expanded_view.get_parent() is None:
             self.root_box.append(self.expanded_view)
 
         Gtk4LayerShell.set_keyboard_mode(self, Gtk4LayerShell.KeyboardMode.ON_DEMAND)
@@ -365,9 +375,9 @@ class SentientPillWindow(Gtk.Window):
         h = self.RUNNING_HEIGHT if self.is_running else self.COLLAPSED_HEIGHT
 
         self.set_visible(False)
-        if self.expanded_view.get_parent() == self.root_box:
-            self.root_box.remove(self.expanded_view)
-        if self.pill_overlay.get_parent() != self.root_box:
+        if self.expanded_view.get_parent() is not None:
+            self.expanded_view.get_parent().remove(self.expanded_view)
+        if self.pill_overlay.get_parent() is None:
             self.root_box.append(self.pill_overlay)
 
         Gtk4LayerShell.set_keyboard_mode(self, Gtk4LayerShell.KeyboardMode.NONE)
