@@ -65,20 +65,20 @@ class BottomNotchShapeBackground(Gtk.DrawingArea):
         self.set_draw_func(self._on_draw)
 
         if self.has_glow:
-            self._timer_id = GLib.timeout_add(33, self._tick_glow)
+            self._tick_id = self.add_tick_callback(self._on_tick_glow)
         else:
-            self._timer_id = 0
+            self._tick_id = 0
 
     def set_glow(self, active: bool) -> None:
         self.has_glow = active
-        if active and self._timer_id == 0:
-            self._timer_id = GLib.timeout_add(33, self._tick_glow)
-        elif not active and self._timer_id != 0:
-            GLib.source_remove(self._timer_id)
-            self._timer_id = 0
+        if active and self._tick_id == 0:
+            self._tick_id = self.add_tick_callback(self._on_tick_glow)
+        elif not active and self._tick_id != 0:
+            self.remove_tick_callback(self._tick_id)
+            self._tick_id = 0
         self.queue_draw()
 
-    def _tick_glow(self) -> bool:
+    def _on_tick_glow(self, widget, frame_clock) -> bool:
         if not self.has_glow:
             return False
         self._glow_angle = (self._glow_angle + 0.03) % (2 * math.pi)

@@ -104,20 +104,20 @@ window.sentient-pill-window {
    SIDEKICK EXTENDED WINDOW SURFACE (Flush to Screen Bottom Bezel)
    ========================================================================= */
 .sidekick-expanded, .living-glass-expanded {
-    background-color: rgba(10, 10, 13, 0.96);
+    background-color: #0c0c0e;
     border: 0.75px solid rgba(255, 255, 255, 0.14);
     border-bottom: none;
     border-top-left-radius: 24px;
     border-top-right-radius: 24px;
     border-bottom-left-radius: 0;
     border-bottom-right-radius: 0;
-    box-shadow: 0 -24px 64px rgba(0, 0, 0, 0.90), 0 0 1px rgba(255, 255, 255, 0.15);
+    box-shadow: 0 -24px 64px rgba(0, 0, 0, 0.95), 0 0 1px rgba(255, 255, 255, 0.15);
     padding: 12px 18px 18px 18px;
 }
 
 /* Official Sidekick Card Header (uploaded_media_1_1793269445180.png / Hero parity) */
 .sidekick-header-card {
-    background-color: rgba(16, 16, 20, 0.95);
+    background-color: #121216;
     border: 0.75px solid rgba(255, 255, 255, 0.12);
     border-radius: 16px;
     margin: 4px 6px 4px 6px;
@@ -326,7 +326,7 @@ window.sentient-pill-window {
    COMPOSER CAPSULE (SidekickComposer.swift parity)
    ========================================================================= */
 .sidekick-composer {
-    background-color: rgba(18, 18, 22, 0.88);
+    background-color: #141418;
     border: 0.75px solid rgba(255, 255, 255, 0.14);
     border-radius: 18px;
     padding: 10px 14px;

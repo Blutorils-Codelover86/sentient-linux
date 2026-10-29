@@ -116,11 +116,22 @@ class GlowProgressBarWidget(Gtk.DrawingArea):
         self.set_draw_func(self._on_draw)
 
         if self.animated:
-            self._timer_id = GLib.timeout_add(33, self._on_tick)
+            self._tick_id = self.add_tick_callback(self._on_frame_tick)
         else:
-            self._timer_id = 0
+            self._tick_id = 0
 
-    def _on_tick(self) -> bool:
+    def set_animated(self, animated: bool) -> None:
+        self.animated = animated
+        if animated and self._tick_id == 0:
+            self._tick_id = self.add_tick_callback(self._on_frame_tick)
+        elif not animated and self._tick_id != 0:
+            self.remove_tick_callback(self._tick_id)
+            self._tick_id = 0
+        self.queue_draw()
+
+    def _on_frame_tick(self, widget, frame_clock) -> bool:
+        if not self.animated:
+            return False
         self.phase = (self.phase + 0.008) % 1.0
         self.queue_draw()
         return True

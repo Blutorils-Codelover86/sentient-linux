@@ -60,10 +60,10 @@ class LivingMascot(Gtk.DrawingArea):
         self._anchor_time: float = self._start_time
         self._current_period: float = 13.0  # seconds / revolution (SpinningLogo.period)
 
-        # 30 FPS tick for smooth official spin with negligible CPU load (<0.5%)
-        interval_ms = 66 if low_power else 33
+        # Frame-clock tick callback for smooth spin aligned with display VSync
+        self._tick_id: int = 0
         if not self.reduced_motion:
-            GLib.timeout_add(interval_ms, self._on_tick)
+            self._tick_id = self.add_tick_callback(self._on_frame_tick)
 
     @property
     def state(self) -> MascotState:
@@ -101,13 +101,18 @@ class LivingMascot(Gtk.DrawingArea):
 
     def set_reduced_motion(self, enabled: bool) -> None:
         self.reduced_motion = enabled
+        if enabled and self._tick_id != 0:
+            self.remove_tick_callback(self._tick_id)
+            self._tick_id = 0
+        elif not enabled and self._tick_id == 0:
+            self._tick_id = self.add_tick_callback(self._on_frame_tick)
         self.queue_draw()
 
     def set_low_power(self, enabled: bool) -> None:
         self.low_power = enabled
         self.queue_draw()
 
-    def _on_tick(self) -> bool:
+    def _on_frame_tick(self, widget, frame_clock) -> bool:
         if not self.reduced_motion:
             self.queue_draw()
         return True

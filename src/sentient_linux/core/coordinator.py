@@ -4,7 +4,9 @@ Orchestrates perception, reasoning, safety policy, and computer use.
 """
 
 from __future__ import annotations
+from dataclasses import dataclass
 import logging
+import threading
 from typing import Any, Dict, Optional
 
 from sentient_linux.core.state_machine import StateMachine, SentientState
@@ -28,10 +30,17 @@ from sentient_linux.security.privacy import ConsentManager
 logger = logging.getLogger("sentient.core.coordinator")
 
 
+@dataclass
+class TaskResult:
+    summary: str
+    success: bool = True
+
+
 class CommandCoordinator:
     """
     Coordinates desktop AI assistance lifecycle.
     Enforces that all actions flow through deterministic safety boundaries.
+    Provides robust state recovery from ERROR and STOPPED states.
     """
 
     def __init__(
@@ -49,6 +58,7 @@ class CommandCoordinator:
         self.emergency_stop = EmergencyStop()
         self.state_machine = StateMachine()
         self.event_bus = event_bus or EventBus()
+        self._request_lock = threading.Lock()
 
         self.policy = policy or SecurityPolicy()
         self.consent_manager = consent_manager or ConsentManager()
@@ -77,17 +87,19 @@ class CommandCoordinator:
         prompt: str,
         include_context: bool = True,
         include_screenshot: bool = False,
-    ) -> Any:
+    ) -> TaskResult:
         """Execute a task instruction with desktop context perception."""
         summary = self.ask(
             prompt=prompt,
             include_context=include_context,
             include_screenshot=include_screenshot,
         )
-        return type("TaskResult", (), {"summary": summary})()
+        return TaskResult(summary=summary, success=True)
 
     def _set_state(self, new_state: SentientState) -> None:
         old_state = self.state_machine.current_state
+        if old_state == new_state:
+            return
         self.state_machine.transition_to(new_state)
         self.event_bus.publish(StateChangedEvent(old_state=old_state, new_state=new_state))
 
@@ -101,72 +113,104 @@ class CommandCoordinator:
         Process a user prompt with desktop perception and inference.
         Guarantees that screenshots are taken on explicit request only and
         temporary files are deterministically cleaned up.
+        Recovers to IDLE if previous request ended in ERROR or STOPPED.
         """
-        self.emergency_stop.check()
-
-        context: Optional[DesktopContext] = None
-        try:
-            self._set_state(SentientState.PERCEIVING)
-            if include_context:
-                context = self.context_manager.snapshot(include_screenshot=include_screenshot)
-                app_title = context.focused_window.title if context.focused_window else "None"
-                self.event_bus.publish(
-                    ContextCapturedEvent(
-                        focused_app=app_title,
-                        open_window_count=len(context.windows),
-                        has_screenshot=bool(context.screenshot),
-                    )
+        with self._request_lock:
+            # 1. Recover from previous ERROR or STOPPED states via valid transitions
+            current = self.state_machine.current_state
+            if current == SentientState.STOPPED:
+                logger.info("Recovering coordinator state: STOPPED -> IDLE")
+                self.emergency_stop.reset()
+                self._set_state(SentientState.IDLE)
+            elif current == SentientState.ERROR:
+                logger.info("Recovering coordinator state: ERROR -> IDLE")
+                self._set_state(SentientState.IDLE)
+            elif current != SentientState.IDLE:
+                raise RuntimeError(
+                    f"Coordinator is busy in state '{current.value}'. Cannot start a new request."
                 )
 
-            self._set_state(SentientState.REASONING)
+            # 2. Emergency stop check
+            self.emergency_stop.check()
 
-            assembled_prompt = prompt
-            image_path = None
-            if context:
-                assembled_prompt = f"{context.to_prompt_context()}\n\n[USER INSTRUCTION]\n{prompt}"
-                if context.screenshot:
-                    image_path = context.screenshot.path
+            context: Optional[DesktopContext] = None
+            try:
+                self._set_state(SentientState.PERCEIVING)
+                if include_context:
+                    context = self.context_manager.snapshot(include_screenshot=include_screenshot)
+                    app_title = context.focused_window.title if context.focused_window else "None"
+                    self.event_bus.publish(
+                        ContextCapturedEvent(
+                            focused_app=app_title,
+                            open_window_count=len(context.windows),
+                            has_screenshot=bool(context.screenshot),
+                        )
+                    )
 
-            response = self.inference.ask(
-                prompt=assembled_prompt,
-                image_path=image_path,
-            )
+                self._set_state(SentientState.REASONING)
 
-            self._set_state(SentientState.FINISHING)
-            self._set_state(SentientState.IDLE)
-            return response
+                assembled_prompt = prompt
+                image_path = None
+                if context:
+                    assembled_prompt = f"{context.to_prompt_context()}\n\n[USER INSTRUCTION]\n{prompt}"
+                    if context.screenshot:
+                        image_path = context.screenshot.path
 
-        except Exception as err:
-            self._set_state(SentientState.ERROR)
-            self.event_bus.publish(ErrorEvent(error_type=type(err).__name__, message=str(err)))
-            raise
+                response = self.inference.ask(
+                    prompt=assembled_prompt,
+                    image_path=image_path,
+                )
 
-        finally:
-            # Deterministic cleanup of temporary screenshot
-            if context and context.screenshot:
-                context.screenshot.cleanup()
+                self._set_state(SentientState.FINISHING)
+                self._set_state(SentientState.IDLE)
+                return response
+
+            except Exception as err:
+                # Transition to ERROR if not stopped
+                if self.state_machine.current_state not in (SentientState.STOPPED, SentientState.ERROR):
+                    try:
+                        self._set_state(SentientState.ERROR)
+                    except Exception as trans_err:
+                        logger.warning("Failed to transition to ERROR: %s", trans_err)
+
+                self.event_bus.publish(ErrorEvent(error_type=type(err).__name__, message=str(err)))
+                raise err
+
+            finally:
+                # Deterministic cleanup of temporary screenshot
+                if context and context.screenshot:
+                    context.screenshot.cleanup()
 
     def execute_action(self, action: ProposedAction) -> Dict[str, Any]:
         """Supervised action execution."""
-        self.emergency_stop.check()
-        self._set_state(SentientState.EXECUTING)
-        try:
-            result = self.supervisor.execute_action(action)
-            self._set_state(SentientState.IDLE)
-            return result
-        except Exception as err:
-            self._set_state(SentientState.ERROR)
-            self.event_bus.publish(ErrorEvent(error_type=type(err).__name__, message=str(err)))
-            raise
+        with self._request_lock:
+            self.emergency_stop.check()
+            if self.state_machine.current_state == SentientState.ERROR:
+                self._set_state(SentientState.IDLE)
+            self._set_state(SentientState.EXECUTING)
+            try:
+                result = self.supervisor.execute_action(action)
+                self._set_state(SentientState.IDLE)
+                return result
+            except Exception as err:
+                if self.state_machine.current_state not in (SentientState.STOPPED, SentientState.ERROR):
+                    self._set_state(SentientState.ERROR)
+                self.event_bus.publish(ErrorEvent(error_type=type(err).__name__, message=str(err)))
+                raise err
 
     def stop(self, reason: str = "User initiated STOP") -> int:
         """Trigger emergency stop immediately."""
         count = self.emergency_stop.trigger(reason)
-        self._set_state(SentientState.STOPPED)
+        if self.state_machine.current_state != SentientState.STOPPED:
+            self._set_state(SentientState.STOPPED)
         self.event_bus.publish(EmergencyStopTriggeredEvent(reason=reason, processes_terminated=count))
         return count
 
     def reset(self) -> None:
         """Reset emergency stop and return to IDLE."""
         self.emergency_stop.reset()
-        self.state_machine.reset()
+        current = self.state_machine.current_state
+        if current in (SentientState.STOPPED, SentientState.ERROR):
+            self._set_state(SentientState.IDLE)
+        else:
+            self.state_machine.reset()

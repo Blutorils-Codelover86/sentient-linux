@@ -44,6 +44,7 @@ class ExpandedView(Gtk.Box):
         self.set_size_request(780, 580)
 
         self._is_running = False
+        self._current_request_id: int = 0
         self._history_records: List[dict] = []
         self._work_card: Optional[Gtk.Box] = None
         self._work_status_label: Optional[Gtk.Label] = None
@@ -276,12 +277,28 @@ class ExpandedView(Gtk.Box):
 
     def _on_submit(self) -> None:
         if self._is_running:
-            self._finish_running(False, "Task stopped by user.")
+            # User clicked Stop button: cancel active task immediately
+            self._current_request_id += 1
+            req_id = self._current_request_id
+            try:
+                self.coordinator.stop(reason="User stopped Sidekick task")
+            except Exception as e:
+                pass
+            self._finish_running(False, "Task stopped by user.", req_id=req_id)
             return
 
         prompt = self.chat_entry.get_text().strip()
         if not prompt:
             return
+
+        # Starting a fresh request: reset coordinator from any prior STOPPED state
+        try:
+            self.coordinator.reset()
+        except Exception:
+            pass
+
+        self._current_request_id += 1
+        req_id = self._current_request_id
 
         self.chat_entry.set_text("")
         self._is_running = True
@@ -310,8 +327,8 @@ class ExpandedView(Gtk.Box):
 
         self._scroll_to_bottom()
 
-        # Run task asynchronously
-        threading.Thread(target=self._execute_prompt, args=(prompt,), daemon=True).start()
+        # Run task asynchronously with request_id to filter out stale callbacks
+        threading.Thread(target=self._execute_prompt, args=(prompt, req_id), daemon=True).start()
 
     def _add_work_disclosure(self, initial_status: str) -> None:
         self._task_start_time = time.perf_counter()
@@ -347,23 +364,29 @@ class ExpandedView(Gtk.Box):
             self._work_timer_label.set_text(f"{elapsed:.1f}s")
         return True
 
-    def _execute_prompt(self, prompt: str) -> None:
+    def _execute_prompt(self, prompt: str, req_id: int) -> None:
+        if req_id != self._current_request_id:
+            return
         try:
-            GLib.idle_add(self._update_work_status, "Consulting desktop context & reasoning…")
+            GLib.idle_add(self._update_work_status, "Consulting desktop context & reasoning…", req_id)
             if hasattr(self.coordinator, "run_task"):
                 res = self.coordinator.run_task(prompt)
                 output = res.summary if hasattr(res, "summary") else str(res)
             else:
                 output = self.coordinator.ask(prompt=prompt, include_context=True)
-            GLib.idle_add(self._finish_running, True, output)
+            GLib.idle_add(self._finish_running, True, output, req_id)
         except Exception as err:
-            GLib.idle_add(self._finish_running, False, f"Inference error: {err}")
+            GLib.idle_add(self._finish_running, False, f"Inference error: {err}", req_id)
 
-    def _update_work_status(self, status: str) -> None:
+    def _update_work_status(self, status: str, req_id: int) -> None:
+        if req_id != self._current_request_id:
+            return
         if self._work_status_label:
             self._work_status_label.set_text(status)
 
-    def _finish_running(self, success: bool, message: str) -> None:
+    def _finish_running(self, success: bool, message: str, req_id: int) -> None:
+        if req_id != self._current_request_id:
+            return
         self._is_running = False
 
         self.send_button.remove_css_class("sidekick-stop-btn")
