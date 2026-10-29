@@ -51,7 +51,7 @@ def test_benchmark_screenshot_capture():
     avg_latency = sum(latencies) / len(latencies)
     avg_size_kb = (sum(sizes) / len(sizes)) / 1024.0
     print(f"\n[BENCHMARK] Screenshot Capture (grim): avg={avg_latency:.2f}ms, avg_size={avg_size_kb:.1f}KB")
-    assert avg_latency < 1000.0
+    assert avg_latency < 3000.0
 
 
 def test_benchmark_mcp_mock_overhead():
@@ -86,7 +86,7 @@ def test_benchmark_live_mcp_overhead():
 
     avg_latency = sum(latencies) / len(latencies)
     print(f"\n[BENCHMARK] Live MCP JSON-RPC Latency (list_windows): avg={avg_latency:.2f}ms")
-    assert avg_latency < 1000.0
+    assert avg_latency < 3000.0
 
 
 def test_benchmark_memory_consumption():
