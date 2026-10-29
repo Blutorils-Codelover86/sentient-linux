@@ -187,6 +187,10 @@ class SentientPillWindow(Gtk.Window):
     COLLAPSED_WIDTH = 340
     COLLAPSED_HEIGHT = 44
     RUNNING_HEIGHT = 68
+    NOTCH_CANVAS_WIDTH = 480
+    NOTCH_CANVAS_HEIGHT = 72
+    CANVAS_WIDTH = 480
+    CANVAS_HEIGHT = 72
     EXPANDED_WIDTH = 780
     EXPANDED_HEIGHT = 580
 
@@ -230,11 +234,16 @@ class SentientPillWindow(Gtk.Window):
         # 2. Install CSS Theme
         self._load_css()
 
-        # 3. Create Root Container
+        # 3. Create Root Container (Fixed outer canvas to eliminate compositor recentering twitch)
         self.root_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
         self.root_box.set_halign(Gtk.Align.CENTER)
         self.root_box.set_valign(Gtk.Align.END)
+        self.root_box.set_size_request(self.NOTCH_CANVAS_WIDTH, self.NOTCH_CANVAS_HEIGHT)
         self.set_child(self.root_box)
+
+        # Set fixed outer surface size for compact / interactive notch
+        self.set_size_request(self.NOTCH_CANVAS_WIDTH, self.NOTCH_CANVAS_HEIGHT)
+        self.set_default_size(self.NOTCH_CANVAS_WIDTH, self.NOTCH_CANVAS_HEIGHT)
 
         # 4. Build Notch Overlay & Full Expanded View
         self._build_notch_overlay()
@@ -247,6 +256,9 @@ class SentientPillWindow(Gtk.Window):
         key_controller = Gtk.EventControllerKey()
         key_controller.connect("key-pressed", self._on_key_pressed)
         self.add_controller(key_controller)
+
+        # 6. Restrict input region when surface is realized
+        self.connect("realize", lambda _: self._update_input_region())
 
         # Set initial resting notch state
         self.set_phase(NotchPhase.HIDDEN)
@@ -283,6 +295,7 @@ class SentientPillWindow(Gtk.Window):
         self.pill_overlay = Gtk.Overlay()
         self.pill_overlay.set_halign(Gtk.Align.CENTER)
         self.pill_overlay.set_valign(Gtk.Align.END)
+        self.pill_overlay.set_vexpand(True)
         self.pill_overlay.add_css_class("bottom-notch-pill")
 
         # Inverted NotchShape background canvas
@@ -595,6 +608,37 @@ class SentientPillWindow(Gtk.Window):
 
         self.pill_stack.add_named(self.message_box, "message")
 
+    def _update_input_region(self) -> None:
+        """
+        Confine pointer interception strictly to the visible notch silhouette.
+        Ensures all transparent areas outside the notch pass clicks and hovers through
+        directly to underlying desktop windows without creating an invisible blocking box.
+        """
+        native = self.get_native()
+        if not native:
+            return
+        surface = native.get_surface()
+        if not surface:
+            return
+
+        if self.is_expanded:
+            rect = cairo.RectangleInt(0, 0, self.EXPANDED_WIDTH, self.EXPANDED_HEIGHT)
+        elif self.phase == NotchPhase.MESSAGE:
+            rect = cairo.RectangleInt(0, 0, 520, 220)
+        else:
+            cw = float(self.NOTCH_CANVAS_WIDTH)
+            ch = float(self.NOTCH_CANVAS_HEIGHT)
+            w = self._current_width
+            h = self._current_height
+            left = max(0, int(math.floor((cw - w) / 2.0)))
+            top = max(0, int(math.floor(ch - h)))
+            w_int = min(int(cw - left), int(math.ceil(w)))
+            h_int = min(int(ch - top), int(math.ceil(h)))
+            rect = cairo.RectangleInt(left, top, w_int, h_int)
+
+        region = cairo.Region(rect)
+        surface.set_input_region(region)
+
     def _on_morph_tick(self, widget: Gtk.Widget, frame_clock: Gdk.FrameClock) -> bool:
         """Frame-clock tick animation for smooth, symmetric notch morphing."""
         if self.is_expanded:
@@ -623,8 +667,8 @@ class SentientPillWindow(Gtk.Window):
             curr_h = int(th)
             self.pill_overlay.set_size_request(curr_w, curr_h)
             self.notch_bg.set_size_request(curr_w, curr_h)
-            self.set_size_request(curr_w, curr_h)
-            self.set_default_size(curr_w, curr_h)
+            self.notch_bg.queue_draw()
+            self._update_input_region()
             self.pill_stack.set_visible_child_name(self.phase.value)
             self._morph_tick_id = 0
             return False
@@ -639,8 +683,8 @@ class SentientPillWindow(Gtk.Window):
 
         self.pill_overlay.set_size_request(curr_w, curr_h)
         self.notch_bg.set_size_request(curr_w, curr_h)
-        self.set_size_request(curr_w, curr_h)
-        self.set_default_size(curr_w, curr_h)
+        self.notch_bg.queue_draw()
+        self._update_input_region()
         return True
 
     def open_notch_input(self) -> None:
@@ -651,7 +695,7 @@ class SentientPillWindow(Gtk.Window):
         self.set_phase(NotchPhase.TYPING)
 
     def set_phase(self, phase: NotchPhase, message_text: str = "") -> None:
-        """Switch notch phase and smoothly animate geometry without widget clipping."""
+        """Switch notch phase and smoothly animate geometry without window resizing."""
         self.phase = phase
         w, h = self.PHASE_DIMENSIONS[phase]
 
@@ -674,15 +718,30 @@ class SentientPillWindow(Gtk.Window):
             self._target_width = float(w)
             self._target_height = float(h)
 
-            if self.reduced_motion:
+            if phase == NotchPhase.MESSAGE:
+                self.set_size_request(520, 220)
+                self.set_default_size(520, 220)
+                self.root_box.set_size_request(520, 220)
+                self.pill_overlay.set_size_request(520, 220)
+                self.notch_bg.set_size_request(520, 220)
+                self._current_width = 520.0
+                self._current_height = 220.0
+                self.pill_stack.set_visible_child_name("message")
+                self._update_input_region()
+            elif self.reduced_motion:
                 self._current_width = float(w)
                 self._current_height = float(h)
+                self.set_size_request(self.NOTCH_CANVAS_WIDTH, self.NOTCH_CANVAS_HEIGHT)
+                self.set_default_size(self.NOTCH_CANVAS_WIDTH, self.NOTCH_CANVAS_HEIGHT)
+                self.root_box.set_size_request(self.NOTCH_CANVAS_WIDTH, self.NOTCH_CANVAS_HEIGHT)
                 self.pill_stack.set_visible_child_name(phase.value)
                 self.pill_overlay.set_size_request(w, h)
                 self.notch_bg.set_size_request(w, h)
-                self.set_size_request(w, h)
-                self.set_default_size(w, h)
+                self._update_input_region()
             else:
+                self.set_size_request(self.NOTCH_CANVAS_WIDTH, self.NOTCH_CANVAS_HEIGHT)
+                self.set_default_size(self.NOTCH_CANVAS_WIDTH, self.NOTCH_CANVAS_HEIGHT)
+                self.root_box.set_size_request(self.NOTCH_CANVAS_WIDTH, self.NOTCH_CANVAS_HEIGHT)
                 if phase == NotchPhase.HIDDEN:
                     # Immediately switch visible child so typing box does not clip
                     self.pill_stack.set_visible_child_name("hidden")
@@ -694,6 +753,8 @@ class SentientPillWindow(Gtk.Window):
                 if self._morph_tick_id == 0:
                     self._last_frame_time = 0
                     self._morph_tick_id = self.add_tick_callback(self._on_morph_tick)
+                else:
+                    self._update_input_region()
 
             # Keyboard focus handling
             if phase in (NotchPhase.TYPING, NotchPhase.MESSAGE):
@@ -839,9 +900,11 @@ class SentientPillWindow(Gtk.Window):
 
         Gtk4LayerShell.set_keyboard_mode(self, Gtk4LayerShell.KeyboardMode.ON_DEMAND)
         Gtk4LayerShell.set_margin(self, Gtk4LayerShell.Edge.BOTTOM, 0)
+        self.root_box.set_size_request(self.EXPANDED_WIDTH, self.EXPANDED_HEIGHT)
         self.set_size_request(self.EXPANDED_WIDTH, self.EXPANDED_HEIGHT)
         self.set_default_size(self.EXPANDED_WIDTH, self.EXPANDED_HEIGHT)
         self.set_visible(True)
+        self._update_input_region()
 
         self.expanded_view.chat_entry.grab_focus()
         logger.info("Sentient Sidekick full conversation opened.")
@@ -862,9 +925,15 @@ class SentientPillWindow(Gtk.Window):
         if self.pill_overlay.get_parent() is None:
             self.root_box.append(self.pill_overlay)
 
+        # Restore fixed outer canvas dimensions
+        self.set_size_request(self.NOTCH_CANVAS_WIDTH, self.NOTCH_CANVAS_HEIGHT)
+        self.set_default_size(self.NOTCH_CANVAS_WIDTH, self.NOTCH_CANVAS_HEIGHT)
+        self.root_box.set_size_request(self.NOTCH_CANVAS_WIDTH, self.NOTCH_CANVAS_HEIGHT)
+
         # Restore notch phase geometry
         self.set_phase(self.phase)
         self.set_visible(True)
+        self._update_input_region()
         logger.info("Sentient Sidekick collapsed to bottom notch.")
 
     def _on_key_pressed(

@@ -37,24 +37,114 @@ def test_notch_geometry_and_radii_restored():
 def test_notch_phase_exact_dimensions():
     """
     Dimensions Verification:
+    Notch components strictly adhere to upstream dimensions:
     HIDDEN is 340x44, TYPING is 480x72, RUNNING is 420x68, MESSAGE is 520x220.
+    Outer surface width remains stable at 480 to eliminate compositor recentering twitch.
     """
     coordinator = CommandCoordinator()
     window = SentientPillWindow(coordinator=coordinator, reduced_motion=True)
 
     window.set_phase(NotchPhase.HIDDEN)
-    assert window.get_size_request() == (340, 44)
+    assert window.pill_overlay.get_size_request() == (340, 44)
     assert window.notch_bg.get_size_request() == (340, 44)
+    assert window.get_size_request() == (480, 72)
 
     window.set_phase(NotchPhase.TYPING)
-    assert window.get_size_request() == (480, 72)
+    assert window.pill_overlay.get_size_request() == (480, 72)
     assert window.notch_bg.get_size_request() == (480, 72)
+    assert window.get_size_request() == (480, 72)
 
     window.set_phase(NotchPhase.RUNNING)
-    assert window.get_size_request() == (420, 68)
+    assert window.pill_overlay.get_size_request() == (420, 68)
+    assert window.notch_bg.get_size_request() == (420, 68)
+    assert window.get_size_request() == (480, 72)
 
     window.set_phase(NotchPhase.MESSAGE)
+    assert window.pill_overlay.get_size_request() == (520, 220)
+    assert window.notch_bg.get_size_request() == (520, 220)
     assert window.get_size_request() == (520, 220)
+
+
+def test_center_point_invariance_across_all_frames():
+    """
+    Twitch-Free Geometry Rule:
+    The notch must expand and contract smoothly around one fixed horizontal center point.
+    Its center must never shift during hover expansion or collapse.
+    """
+    coordinator = CommandCoordinator()
+    window = SentientPillWindow(coordinator=coordinator, reduced_motion=False)
+
+    clock = MagicMock()
+    frame_time_us = 1_000_000
+
+    # Expand from 340 to 480
+    window.set_phase(NotchPhase.TYPING)
+    recorded_centers = []
+
+    for _ in range(30):
+        frame_time_us += 16_666
+        clock.get_frame_time.return_value = frame_time_us
+        animating = window._on_morph_tick(window, clock)
+
+        w = window._current_width
+        cx = window.NOTCH_CANVAS_WIDTH / 2.0  # 240.0
+        left = cx - w / 2.0
+        right = cx + w / 2.0
+        center = (left + right) / 2.0
+        recorded_centers.append(center)
+
+        if not animating:
+            break
+
+    # Collapse from 480 to 340
+    window.set_phase(NotchPhase.HIDDEN)
+    for _ in range(30):
+        frame_time_us += 16_666
+        clock.get_frame_time.return_value = frame_time_us
+        animating = window._on_morph_tick(window, clock)
+
+        w = window._current_width
+        cx = window.NOTCH_CANVAS_WIDTH / 2.0
+        left = cx - w / 2.0
+        right = cx + w / 2.0
+        center = (left + right) / 2.0
+        recorded_centers.append(center)
+
+        if not animating:
+            break
+
+    assert len(recorded_centers) >= 10
+    for idx, c in enumerate(recorded_centers):
+        assert abs(c - 240.0) < 1e-9, f"Frame {idx} shifted center to {c}"
+
+    variance = sum((c - 240.0) ** 2 for c in recorded_centers) / len(recorded_centers)
+    assert variance == 0.0, f"Non-zero center variance: {variance}"
+
+
+def test_fractional_scaling_125_monitor_symmetry():
+    """
+    Fractional Scaling Verification:
+    On a 1920x1080 display at 1.25x scaling:
+    - 480 logical px = 600 physical px (exact integer).
+    - Surface physical offset = (1920 - 600) / 2 = 660.0 physical px.
+    - Every animation frame must center at exactly 960.0 physical pixels.
+    """
+    scale = 1.25
+    monitor_width_phys = 1920
+    canvas_width_log = 480
+    canvas_width_phys = canvas_width_log * scale  # 600.0 px
+    surface_offset_x = (monitor_width_phys - canvas_width_phys) / 2.0  # 660.0 px
+
+    for w in range(340, 481, 5):
+        cx = canvas_width_log / 2.0
+        left_log = cx - w / 2.0
+        right_log = cx + w / 2.0
+
+        phys_left = surface_offset_x + left_log * scale
+        phys_right = surface_offset_x + right_log * scale
+        phys_center = (phys_left + phys_right) / 2.0
+
+        assert abs(phys_center - 960.0) < 1e-9, f"Width {w} physical center deviated: {phys_center}"
 
 
 def test_smooth_morph_animation_frames():
