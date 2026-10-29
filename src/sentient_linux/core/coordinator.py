@@ -26,6 +26,7 @@ from sentient_linux.computer_use.supervisor import ActionSupervisor
 from sentient_linux.security.emergency_stop import EmergencyStop
 from sentient_linux.security.policy import SecurityPolicy
 from sentient_linux.security.privacy import ConsentManager
+from sentient_linux.core.conversation import ConversationStore
 
 logger = logging.getLogger("sentient.core.coordinator")
 
@@ -71,6 +72,7 @@ class CommandCoordinator:
             consent_manager=self.consent_manager,
         )
         self.supervisor = supervisor or ActionSupervisor(policy=self.policy)
+        self.conversation = ConversationStore()
 
     @property
     def active_model(self) -> str:

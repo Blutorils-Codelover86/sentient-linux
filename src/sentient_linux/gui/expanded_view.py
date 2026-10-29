@@ -45,6 +45,7 @@ class ExpandedView(Gtk.Box):
 
         self._is_running = False
         self._current_request_id: int = 0
+        self._rendered_record_ids: set[str] = set()
         self._history_records: List[dict] = []
         self._work_card: Optional[Gtk.Box] = None
         self._work_status_label: Optional[Gtk.Label] = None
@@ -322,6 +323,10 @@ class ExpandedView(Gtk.Box):
         user_row.append(user_label)
         self.content_box.append(user_row)
 
+        if hasattr(self.coordinator, "conversation") and self.coordinator.conversation:
+            rec = self.coordinator.conversation.append_message("user", prompt)
+            self._rendered_record_ids.add(rec.id)
+
         # 2. Add Work Disclosure Card (SidekickWorkDisclosure)
         self._add_work_disclosure("Thinking…")
 
@@ -407,6 +412,50 @@ class ExpandedView(Gtk.Box):
         assist_row.append(assist_label)
         self.content_box.append(assist_row)
 
+        if hasattr(self.coordinator, "conversation") and self.coordinator.conversation:
+            rec = self.coordinator.conversation.append_message(
+                role="assistant",
+                text=message,
+                duration_s=elapsed if self._work_status_label else 0.0,
+                status="done" if success else "failed",
+            )
+            self._rendered_record_ids.add(rec.id)
+
+        self._scroll_to_bottom()
+
+    def sync_from_store(self) -> None:
+        """Sync and render any unrendered messages from shared conversation store."""
+        if not hasattr(self.coordinator, "conversation") or not self.coordinator.conversation:
+            return
+
+        records = self.coordinator.conversation.records
+        if records and self.empty_state_box.get_parent() == self.content_box:
+            self.content_box.remove(self.empty_state_box)
+
+        for rec in records:
+            if rec.id in self._rendered_record_ids:
+                continue
+
+            self._rendered_record_ids.add(rec.id)
+            if rec.role == "user":
+                user_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
+                user_row.set_halign(Gtk.Align.END)
+                user_label = Gtk.Label(label=rec.text)
+                user_label.set_wrap(True)
+                user_label.set_xalign(0.0)
+                user_label.add_css_class("sidekick-user-bubble")
+                user_row.append(user_label)
+                self.content_box.append(user_row)
+            else:
+                assist_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
+                assist_row.set_halign(Gtk.Align.START)
+                assist_label = Gtk.Label(label=rec.text)
+                assist_label.set_wrap(True)
+                assist_label.set_xalign(0.0)
+                assist_label.add_css_class("sidekick-assistant-message")
+                assist_row.append(assist_label)
+                self.content_box.append(assist_row)
+
         self._scroll_to_bottom()
 
     def clear_chat(self) -> None:
@@ -419,6 +468,9 @@ class ExpandedView(Gtk.Box):
         self._work_card = None
         self._work_status_label = None
         self._work_timer_label = None
+        self._rendered_record_ids.clear()
+        if hasattr(self.coordinator, "conversation") and self.coordinator.conversation:
+            self.coordinator.conversation.clear()
         self.content_box.append(self.empty_state_box)
 
     def _scroll_to_bottom(self) -> None:

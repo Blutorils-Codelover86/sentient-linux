@@ -432,4 +432,125 @@ window.sentient-pill-window {
     color: #ffc371;
     font-size: 11px;
 }
+
+/* =========================================================================
+   OFFICIAL NOTCH INTERACTIVE STYLES (NotchView & SidekickNotchMessageView)
+   ========================================================================= */
+.notch-icon-btn {
+    min-width: 28px;
+    min-height: 28px;
+    border-radius: 8px;
+    background-color: rgba(255, 255, 255, 0.06);
+    border: 0.75px solid rgba(255, 255, 255, 0.12);
+    color: rgba(255, 255, 255, 0.85);
+    padding: 0;
+    font-size: 13px;
+    transition: all 120ms ease;
+}
+
+.notch-icon-btn:hover {
+    background-color: rgba(255, 255, 255, 0.14);
+    border-color: rgba(255, 255, 255, 0.25);
+    color: #ffffff;
+}
+
+.notch-typing-entry {
+    background-color: transparent;
+    border: none;
+    outline: none;
+    box-shadow: none;
+    color: #ededed;
+    font-size: 13.5px;
+    caret-color: #ffffff;
+    padding: 2px 4px;
+}
+
+.notch-typing-entry:focus {
+    box-shadow: none;
+}
+
+.notch-action-btn {
+    background-color: rgba(255, 255, 255, 0.09);
+    border: 0.75px solid rgba(255, 255, 255, 0.14);
+    border-radius: 10px;
+    color: rgba(255, 255, 255, 0.94);
+    font-size: 12px;
+    font-weight: 500;
+    padding: 4px 12px;
+    transition: all 120ms ease;
+}
+
+.notch-action-btn:hover {
+    background-color: rgba(255, 255, 255, 0.14);
+    border-color: rgba(255, 255, 255, 0.24);
+    color: #ffffff;
+}
+
+.notch-secondary-btn {
+    background-color: rgba(255, 255, 255, 0.045);
+    border: 0.75px solid rgba(255, 255, 255, 0.10);
+    border-radius: 10px;
+    color: rgba(255, 255, 255, 0.73);
+    font-size: 11px;
+    font-weight: 500;
+    padding: 3px 8px;
+    transition: all 120ms ease;
+}
+
+.notch-secondary-btn:hover {
+    background-color: rgba(255, 255, 255, 0.09);
+    border-color: rgba(255, 255, 255, 0.18);
+    color: #ffffff;
+}
+
+.notch-reply-box {
+    background-color: rgba(255, 255, 255, 0.065);
+    border: 0.75px solid rgba(255, 255, 255, 0.14);
+    border-radius: 12px;
+    padding: 4px 10px;
+    transition: all 150ms ease;
+}
+
+.notch-reply-box:focus-within {
+    background-color: rgba(255, 255, 255, 0.10);
+    border-color: rgba(255, 255, 255, 0.32);
+}
+
+.notch-reply-entry {
+    background-color: transparent;
+    border: none;
+    outline: none;
+    box-shadow: none;
+    color: rgba(255, 255, 255, 0.94);
+    font-size: 13px;
+    caret-color: #ffffff;
+    padding: 2px 4px;
+}
+
+.notch-reply-entry:focus {
+    box-shadow: none;
+}
+
+.notch-send-pill {
+    min-width: 26px;
+    min-height: 26px;
+    border-radius: 13px;
+    background-color: rgba(255, 255, 255, 0.94);
+    border: none;
+    color: #000000;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 0;
+}
+
+.notch-send-pill:disabled {
+    background-color: rgba(255, 255, 255, 0.25);
+    color: rgba(0, 0, 0, 0.4);
+}
+
+.notch-message-text {
+    color: #ededed;
+    font-size: 13px;
+    line-height: 1.45;
+}
 """

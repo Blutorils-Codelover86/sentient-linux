@@ -2,14 +2,21 @@
 Bottom-attached Sentient Dynamic Island Notch for Wayland / Hyprland.
 Uses Gtk4LayerShell to anchor flush to the bottom screen edge (0px margin).
 Renders the exact inverted NotchShape with concave shoulder fillets emerging from the bezel.
-Features authentic upstream NotchView running state (GlowHalo edge glow, status narration).
+Faithful port of upstream Sentient OS Notch & Sidekick interaction hierarchy:
+- Phase A: Compact resting notch (NotchPhase.HIDDEN: 340x44)
+- Phase B1: Interactive notch quick prompt (NotchPhase.TYPING: 480x72)
+- Phase B2: Active computer-use progress & GlowHalo edge glow (NotchPhase.RUNNING: 420x68)
+- Phase B3: Inline response preview & quick reply (NotchPhase.MESSAGE: 520x220)
+- Phase C: Full Sidekick conversation window (780x580, opened via explicit arrow.up.forward.app)
 """
 
 from __future__ import annotations
 import ctypes
+from enum import Enum
 import logging
 import math
 import os
+import threading
 import time
 from typing import Callable, Optional
 
@@ -34,9 +41,18 @@ from gi.repository import Gtk, Gdk, Gtk4LayerShell, GLib, Pango
 from sentient_linux.core.coordinator import CommandCoordinator
 from sentient_linux.gui.mascot import LivingMascot, MascotState
 from sentient_linux.gui.expanded_view import ExpandedView
+from sentient_linux.gui.conversation import ConversationStore, ConversationRecord
 from sentient_linux.gui.theme import THEME, GTK_CSS
 
 logger = logging.getLogger("sentient.gui.pill_window")
+
+
+class NotchPhase(Enum):
+    """Upstream NotchPhase parity."""
+    HIDDEN = "hidden"    # Idle resting pill flush to bezel (340x44)
+    TYPING = "typing"    # Interactive quick prompt field (480x72)
+    RUNNING = "running"  # Active computer-use narration & edge glow (420x68)
+    MESSAGE = "message"  # Inline response reading & quick reply (520x220)
 
 
 class BottomNotchShapeBackground(Gtk.DrawingArea):
@@ -128,8 +144,8 @@ class BottomNotchShapeBackground(Gtk.DrawingArea):
         cr.line_to(0, h)
         cr.close_path()
 
-        # Fill dark OLED acrylic (rgba(10, 10, 13, 0.96))
-        cr.set_source_rgba(0.04, 0.04, 0.05, 0.96)
+        # Fill dark OLED acrylic (#0c0c0e)
+        cr.set_source_rgba(0.047, 0.047, 0.055, 1.0)
         cr.fill()
 
         # 3. Open Skirt Path (NotchSkirtShape.swift parity): stroke only visible edges
@@ -146,23 +162,31 @@ class BottomNotchShapeBackground(Gtk.DrawingArea):
         cr.set_source_rgba(1.0, 1.0, 1.0, 0.16)
         cr.set_line_width(0.75)
         cr.stroke()
-        cr.set_source_rgba(1.0, 1.0, 1.0, 0.16)
-        cr.set_line_width(0.75)
-        cr.stroke()
 
 
 class SentientPillWindow(Gtk.Window):
     """
     Bottom-attached Wayland Layer-Shell window.
-    Faithful port of Sentient OS Notch & Sidekick interface:
-    - Collapsed: Attached flush to the bottom screen bezel (0px margin), inverted NotchShape.
-    - Expanded: Fluid upward expansion into full Sidekick conversation panel.
-    - Synchronous geometry renegotiation ensures zero stretching across the monitor.
+    Faithful port of official Sentient OS Notch & Sidekick interface.
+    Separates the Notch interaction hierarchy from the Full Sidekick conversation:
+    - Phase A: Compact resting notch (340x44)
+    - Phase B1: Interactive notch quick prompt (480x72)
+    - Phase B2: Active computer-use progress & GlowHalo edge glow (420x68)
+    - Phase B3: Inline response preview & quick reply (520x220)
+    - Phase C: Full Sidekick conversation window (780x580)
     """
 
+    # Dimensions per phase (NotchMetrics parity)
+    PHASE_DIMENSIONS = {
+        NotchPhase.HIDDEN: (340, 44),
+        NotchPhase.TYPING: (480, 72),
+        NotchPhase.RUNNING: (420, 68),
+        NotchPhase.MESSAGE: (520, 220),
+    }
+
     COLLAPSED_WIDTH = 340
-    COLLAPSED_HEIGHT = 40
-    RUNNING_HEIGHT = 56
+    COLLAPSED_HEIGHT = 44
+    RUNNING_HEIGHT = 68
     EXPANDED_WIDTH = 780
     EXPANDED_HEIGHT = 580
 
@@ -180,8 +204,12 @@ class SentientPillWindow(Gtk.Window):
         self.coordinator = coordinator or CommandCoordinator()
         self.low_power = low_power
         self.reduced_motion = reduced_motion
-        self.is_expanded = False
-        self.is_running = False
+
+        self.phase: NotchPhase = NotchPhase.HIDDEN
+        self.is_expanded: bool = False
+        self.is_running: bool = False
+        self._current_request_id: int = 0
+        self._task_start_time: float = 0.0
 
         self.add_css_class("sentient-pill-window")
 
@@ -197,26 +225,26 @@ class SentientPillWindow(Gtk.Window):
         self.root_box.set_valign(Gtk.Align.END)
         self.set_child(self.root_box)
 
-        # 4. Build Collapsed Pill and Expanded View
-        self._build_collapsed_pill()
+        # 4. Build Notch Overlay & Full Expanded View
+        self._build_notch_overlay()
         self.expanded_view = ExpandedView(
             coordinator=self.coordinator,
             on_collapse=self.collapse,
         )
 
-        # 5. Connect Global Keyboard Event (Escape to collapse)
+        # 5. Global Keyboard Controller
         key_controller = Gtk.EventControllerKey()
         key_controller.connect("key-pressed", self._on_key_pressed)
         self.add_controller(key_controller)
 
-        # Show initially collapsed
-        self.collapse()
+        # Set initial resting notch state
+        self.set_phase(NotchPhase.HIDDEN)
 
     def _init_layer_shell(self) -> None:
         """Configure Wayland layer shell geometry and layer pinning."""
         Gtk4LayerShell.init_for_window(self)
         Gtk4LayerShell.set_layer(self, Gtk4LayerShell.Layer.TOP)
-        Gtk4LayerShell.set_namespace(self, "sentient-pill")
+        Gtk4LayerShell.set_namespace(self, "sentient-notch")
 
         # Anchor bottom-center strictly
         Gtk4LayerShell.set_anchor(self, Gtk4LayerShell.Edge.BOTTOM, True)
@@ -226,8 +254,6 @@ class SentientPillWindow(Gtk.Window):
 
         # Attached flush to bottom edge: 0 logical pixels margin!
         Gtk4LayerShell.set_margin(self, Gtk4LayerShell.Edge.BOTTOM, 0)
-
-        # Zero focus theft when idle
         Gtk4LayerShell.set_keyboard_mode(self, Gtk4LayerShell.KeyboardMode.NONE)
 
     def _load_css(self) -> None:
@@ -241,29 +267,44 @@ class SentientPillWindow(Gtk.Window):
                 Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION,
             )
 
-    def _build_collapsed_pill(self) -> None:
+    def _build_notch_overlay(self) -> None:
+        """Build the dynamic notch stack with all upstream interactive phases."""
         self.pill_overlay = Gtk.Overlay()
         self.pill_overlay.set_halign(Gtk.Align.CENTER)
         self.pill_overlay.set_valign(Gtk.Align.END)
-        self.pill_overlay.set_size_request(self.COLLAPSED_WIDTH, self.COLLAPSED_HEIGHT)
         self.pill_overlay.add_css_class("bottom-notch-pill")
 
-        # Background drawing with concave fillets curving into the bezel
+        # Inverted NotchShape background canvas
         self.notch_bg = BottomNotchShapeBackground(top_radius=14.0, shoulder_radius=10.0)
-        self.notch_bg.set_size_request(self.COLLAPSED_WIDTH, self.COLLAPSED_HEIGHT)
         self.pill_overlay.set_child(self.notch_bg)
 
-        # Stack container for Idle Row vs Running Row
+        # Dynamic Stack for Notch Phases
         self.pill_stack = Gtk.Stack()
         self.pill_stack.set_transition_type(Gtk.StackTransitionType.CROSSFADE)
         self.pill_stack.set_hhomogeneous(False)
         self.pill_stack.set_vhomogeneous(False)
 
-        # --- View 1: Idle Row ---
+        # --- Phase 1: Idle Resting Notch (NotchPhase.HIDDEN) ---
+        self._build_idle_view()
+
+        # --- Phase 2: Interactive Prompt Input (NotchPhase.TYPING) ---
+        self._build_typing_view()
+
+        # --- Phase 3: Active Computer-Use Progress (NotchPhase.RUNNING) ---
+        self._build_running_view()
+
+        # --- Phase 4: Inline Response & Reply (NotchPhase.MESSAGE) ---
+        self._build_message_view()
+
+        self.pill_overlay.add_overlay(self.pill_stack)
+        self.root_box.append(self.pill_overlay)
+
+    def _build_idle_view(self) -> None:
+        """Resting notch (340x44): Click opens TYPING quick input."""
         self.idle_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
         self.idle_box.add_css_class("bottom-notch-content")
         self.idle_box.set_valign(Gtk.Align.CENTER)
-        self.idle_box.set_size_request(self.COLLAPSED_WIDTH, self.COLLAPSED_HEIGHT)
+        self.idle_box.set_size_request(340, 44)
 
         self.pill_mascot = LivingMascot(
             size=20,
@@ -281,19 +322,77 @@ class SentientPillWindow(Gtk.Window):
         right_glyph = Gtk.Label(label="⌃")
         right_glyph.add_css_class("whisper-text")
         self.idle_box.append(right_glyph)
-        self.pill_stack.add_named(self.idle_box, "idle")
 
-        # --- View 2: Running Computer-Use Row (NotchView parity) ---
-        self.running_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
+        # Official upstream behavior: Click on resting notch opens quick typing field
+        click_gesture = Gtk.GestureClick()
+        click_gesture.connect("released", lambda *_: self.open_notch_input())
+        self.idle_box.add_controller(click_gesture)
+
+        self.pill_stack.add_named(self.idle_box, "hidden")
+
+    def _build_typing_view(self) -> None:
+        """Interactive notch for quick prompt (480x72): Esc cancels, ⇱ opens Full Sidekick."""
+        self.typing_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
+        self.typing_box.add_css_class("bottom-notch-content")
+        self.typing_box.set_valign(Gtk.Align.CENTER)
+        self.typing_box.set_size_request(480, 72)
+        self.typing_box.set_margin_start(16)
+        self.typing_box.set_margin_end(16)
+        self.typing_box.set_margin_top(8)
+        self.typing_box.set_margin_bottom(8)
+
+        # Top Bar: Mascot + "Sidekick" + Open in Full Conversation (arrow.up.forward.app) + Send
+        top_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        mascot = LivingMascot(size=16, low_power=self.low_power, reduced_motion=self.reduced_motion)
+        top_row.append(mascot)
+
+        title = Gtk.Label(label="Sidekick")
+        title.add_css_class("sidekick-card-subtitle")
+        title.set_hexpand(True)
+        title.set_xalign(0.0)
+        top_row.append(title)
+
+        # Upstream arrow.up.forward.app: Explicit action to open full conversation
+        open_btn = Gtk.Button(label="⇱")
+        open_btn.add_css_class("notch-icon-btn")
+        open_btn.set_tooltip_text("Open conversation in Sentient")
+        open_btn.connect("clicked", lambda _: self.expand(draft=self.typing_entry.get_text()))
+        top_row.append(open_btn)
+
+        self.typing_send_btn = Gtk.Button(label="↑")
+        self.typing_send_btn.add_css_class("notch-send-pill")
+        self.typing_send_btn.set_sensitive(False)
+        self.typing_send_btn.connect("clicked", lambda _: self._on_typing_submit())
+        top_row.append(self.typing_send_btn)
+
+        self.typing_box.append(top_row)
+
+        # Input Field: "What can I take over for you?"
+        self.typing_entry = Gtk.Entry()
+        self.typing_entry.set_placeholder_text("What can I take over for you?")
+        self.typing_entry.add_css_class("notch-typing-entry")
+        self.typing_entry.connect("changed", self._on_typing_changed)
+        self.typing_entry.connect("activate", lambda _: self._on_typing_submit())
+        self.typing_box.append(self.typing_entry)
+
+        self.pill_stack.add_named(self.typing_box, "typing")
+
+    def _build_running_view(self) -> None:
+        """Active progress notch (420x68): GlowHalo edge glow, status narration, STOP button."""
+        self.running_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=3)
         self.running_box.add_css_class("bottom-notch-content")
         self.running_box.set_valign(Gtk.Align.CENTER)
-        self.running_box.set_size_request(self.COLLAPSED_WIDTH, self.RUNNING_HEIGHT)
+        self.running_box.set_size_request(420, 68)
+        self.running_box.set_margin_start(16)
+        self.running_box.set_margin_end(16)
+        self.running_box.set_margin_top(8)
+        self.running_box.set_margin_bottom(8)
 
-        # Top row: Logo + Stop Button
+        # Top row: Logo + Sidekick indicator + Open in Full + STOP
         top_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
-        running_mascot = LivingMascot(size=18, low_power=self.low_power, reduced_motion=self.reduced_motion)
-        running_mascot.set_state(MascotState.THINKING)
-        top_row.append(running_mascot)
+        self.running_mascot = LivingMascot(size=16, low_power=self.low_power, reduced_motion=self.reduced_motion)
+        self.running_mascot.set_state(MascotState.THINKING)
+        top_row.append(self.running_mascot)
 
         run_title = Gtk.Label(label="Sidekick")
         run_title.add_css_class("sidekick-work-status")
@@ -301,59 +400,282 @@ class SentientPillWindow(Gtk.Window):
         run_title.set_xalign(0.0)
         top_row.append(run_title)
 
+        open_btn = Gtk.Button(label="⇱")
+        open_btn.add_css_class("notch-icon-btn")
+        open_btn.set_tooltip_text("Open conversation in Sentient")
+        open_btn.connect("clicked", lambda _: self.expand())
+        top_row.append(open_btn)
+
         stop_btn = Gtk.Button(label="■")
         stop_btn.add_css_class("sidekick-stop-btn")
-        stop_btn.connect("clicked", lambda _: self.set_running(False))
+        stop_btn.set_tooltip_text("Stop this task")
+        stop_btn.connect("clicked", lambda _: self.stop_task())
         top_row.append(stop_btn)
+
         self.running_box.append(top_row)
 
-        # Bottom row: Monospace Live Status narration
-        self.status_line = Gtk.Label(label="mcp: sentient_native/click (completed)...")
+        # Bottom row: Live Monospace status narration
+        self.status_line = Gtk.Label(label="Consulting desktop context & reasoning…")
         self.status_line.add_css_class("whisper-text")
         self.status_line.set_xalign(0.0)
         self.status_line.set_ellipsize(Pango.EllipsizeMode.END)
-        self.status_line.set_max_width_chars(32)
+        self.status_line.set_max_width_chars(38)
         self.running_box.append(self.status_line)
 
         self.pill_stack.add_named(self.running_box, "running")
-        self.pill_stack.set_visible_child_name("idle")
 
-        self.pill_overlay.add_overlay(self.pill_stack)
+    def _build_message_view(self) -> None:
+        """Inline response & reply view (520x220) (SidekickNotchMessageView parity)."""
+        self.message_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+        self.message_box.add_css_class("bottom-notch-content")
+        self.message_box.set_valign(Gtk.Align.CENTER)
+        self.message_box.set_size_request(520, 220)
+        self.message_box.set_margin_start(16)
+        self.message_box.set_margin_end(16)
+        self.message_box.set_margin_top(8)
+        self.message_box.set_margin_bottom(10)
 
-        # Click gesture to expand
-        click_gesture = Gtk.GestureClick()
-        click_gesture.connect("released", lambda *_: self.expand())
-        self.pill_overlay.add_controller(click_gesture)
+        # Header: Mascot + Title + Timestamp + Open in Full + Close
+        hdr = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+        msg_mascot = LivingMascot(size=14, low_power=self.low_power, reduced_motion=self.reduced_motion)
+        hdr.append(msg_mascot)
+
+        self.msg_title_lbl = Gtk.Label(label="Sidekick")
+        self.msg_title_lbl.add_css_class("sidekick-card-subtitle")
+        hdr.append(self.msg_title_lbl)
+
+        self.msg_time_lbl = Gtk.Label(label="")
+        self.msg_time_lbl.add_css_class("whisper-text")
+        self.msg_time_lbl.set_hexpand(True)
+        self.msg_time_lbl.set_xalign(0.0)
+        hdr.append(self.msg_time_lbl)
+
+        open_btn = Gtk.Button(label="⇱")
+        open_btn.add_css_class("notch-icon-btn")
+        open_btn.set_tooltip_text("Open conversation in Sentient")
+        open_btn.connect("clicked", lambda _: self.expand())
+        hdr.append(open_btn)
+
+        close_btn = Gtk.Button(label="✕")
+        close_btn.add_css_class("notch-icon-btn")
+        close_btn.set_tooltip_text("Hide response (stays in history)")
+        close_btn.connect("clicked", lambda _: self.set_phase(NotchPhase.HIDDEN))
+        hdr.append(close_btn)
+
+        self.message_box.append(hdr)
+
+        # Scrollable response text area
+        scroller = Gtk.ScrolledWindow()
+        scroller.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+        scroller.set_max_content_height(100)
+        scroller.set_min_content_height(50)
+        scroller.set_hexpand(True)
+        scroller.set_vexpand(True)
+
+        self.message_text_label = Gtk.Label(label="")
+        self.message_text_label.add_css_class("notch-message-text")
+        self.message_text_label.set_wrap(True)
+        self.message_text_label.set_selectable(True)
+        self.message_text_label.set_xalign(0.0)
+        scroller.set_child(self.message_text_label)
+        self.message_box.append(scroller)
+
+        # Reply row (capsule with input and send button) + Open in Sentient footer link
+        reply_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+
+        reply_capsule = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+        reply_capsule.add_css_class("notch-reply-box")
+        reply_capsule.set_hexpand(True)
+
+        self.reply_entry = Gtk.Entry()
+        self.reply_entry.set_placeholder_text("Reply to Sidekick…")
+        self.reply_entry.add_css_class("notch-reply-entry")
+        self.reply_entry.set_hexpand(True)
+        self.reply_entry.connect("activate", lambda _: self._on_inline_reply_submit())
+        reply_capsule.append(self.reply_entry)
+
+        send_reply_btn = Gtk.Button(label="↑")
+        send_reply_btn.add_css_class("notch-send-pill")
+        send_reply_btn.connect("clicked", lambda _: self._on_inline_reply_submit())
+        reply_capsule.append(send_reply_btn)
+        reply_row.append(reply_capsule)
+
+        footer_open_btn = Gtk.Button(label="Open ↗")
+        footer_open_btn.add_css_class("notch-action-btn")
+        footer_open_btn.set_tooltip_text("Open full conversation")
+        footer_open_btn.connect("clicked", lambda _: self.expand())
+        reply_row.append(footer_open_btn)
+
+        self.message_box.append(reply_row)
+
+        self.pill_stack.add_named(self.message_box, "message")
+
+    def open_notch_input(self) -> None:
+        """Clicking resting notch enters interactive quick prompt mode."""
+        if self.is_running:
+            self.set_phase(NotchPhase.RUNNING)
+            return
+        self.set_phase(NotchPhase.TYPING)
+
+    def set_phase(self, phase: NotchPhase, message_text: str = "") -> None:
+        """Switch notch phase and synchronously resize surface without stretching."""
+        self.phase = phase
+        w, h = self.PHASE_DIMENSIONS[phase]
+
+        # Edge glow active during RUNNING phase
+        is_running = (phase == NotchPhase.RUNNING)
+        self.is_running = is_running
+        self.notch_bg.set_glow(is_running)
+
+        if phase == NotchPhase.RUNNING:
+            self.running_mascot.set_state(MascotState.THINKING)
+        elif phase == NotchPhase.MESSAGE:
+            if message_text:
+                self.message_text_label.set_text(message_text)
+            self.msg_time_lbl.set_text(time.strftime("%H:%M"))
+            self.reply_entry.set_text("")
+        elif phase == NotchPhase.HIDDEN:
+            self.pill_mascot.set_state(MascotState.IDLE)
+
+        self.pill_stack.set_visible_child_name(phase.value)
+
+        if not self.is_expanded:
+            self.pill_overlay.set_size_request(w, h)
+            self.notch_bg.set_size_request(w, h)
+            self.set_size_request(w, h)
+            self.set_default_size(w, h)
+
+            # Keyboard focus handling
+            if phase in (NotchPhase.TYPING, NotchPhase.MESSAGE):
+                Gtk4LayerShell.set_keyboard_mode(self, Gtk4LayerShell.KeyboardMode.ON_DEMAND)
+                if phase == NotchPhase.TYPING:
+                    self.typing_entry.grab_focus()
+                elif phase == NotchPhase.MESSAGE:
+                    self.reply_entry.grab_focus()
+            else:
+                Gtk4LayerShell.set_keyboard_mode(self, Gtk4LayerShell.KeyboardMode.NONE)
+
+        logger.info("Sentient Notch transitioned to phase: %s", phase.value)
 
     def set_running(self, running: bool, status: str = "") -> None:
-        """Switch notch presentation between idle whisper and active computer-use narration."""
-        self.is_running = running
-        self.notch_bg.set_glow(running)
-        h = self.RUNNING_HEIGHT if running else self.COLLAPSED_HEIGHT
-
+        """Compatibility method for external task state updates."""
         if running:
             if status:
                 self.status_line.set_text(status)
-            self.pill_stack.set_visible_child_name("running")
-            self.pill_mascot.set_state(MascotState.THINKING)
+            self.set_phase(NotchPhase.RUNNING)
         else:
-            self.pill_stack.set_visible_child_name("idle")
-            self.pill_mascot.set_state(MascotState.IDLE)
+            self.set_phase(NotchPhase.HIDDEN)
 
-        if not self.is_expanded:
-            self.pill_overlay.set_size_request(self.COLLAPSED_WIDTH, h)
-            self.notch_bg.set_size_request(self.COLLAPSED_WIDTH, h)
-            self.set_size_request(self.COLLAPSED_WIDTH, h)
-            self.set_default_size(self.COLLAPSED_WIDTH, h)
+    def _on_typing_changed(self, entry: Gtk.Entry) -> None:
+        text = entry.get_text().strip()
+        self.typing_send_btn.set_sensitive(bool(text))
 
-    def expand(self) -> None:
-        """Expand upward into full Sentient Sidekick interface."""
+    def _on_typing_submit(self) -> None:
+        prompt = self.typing_entry.get_text().strip()
+        if not prompt or self.is_running:
+            return
+        self.typing_entry.set_text("")
+        self.submit_prompt(prompt)
+
+    def _on_inline_reply_submit(self) -> None:
+        reply = self.reply_entry.get_text().strip()
+        if not reply or self.is_running:
+            return
+        self.reply_entry.set_text("")
+        self.submit_prompt(reply)
+
+    def submit_prompt(self, prompt: str) -> None:
+        """Submit a prompt from the notch: records message, enters RUNNING, runs inference."""
+        # Reset coordinator if recovering from STOPPED
+        try:
+            self.coordinator.reset()
+        except Exception:
+            pass
+
+        self._current_request_id += 1
+        req_id = self._current_request_id
+        self._task_start_time = time.perf_counter()
+
+        # Record in shared conversation store
+        if hasattr(self.coordinator, "conversation") and self.coordinator.conversation:
+            self.coordinator.conversation.append_message("user", prompt)
+
+        self.set_phase(NotchPhase.RUNNING)
+        self.status_line.set_text("Consulting desktop context & reasoning…")
+
+        # Execute asynchronously
+        threading.Thread(target=self._execute_task, args=(prompt, req_id), daemon=True).start()
+
+    def _execute_task(self, prompt: str, req_id: int) -> None:
+        if req_id != self._current_request_id:
+            return
+        try:
+            if hasattr(self.coordinator, "run_task"):
+                res = self.coordinator.run_task(prompt)
+                output = res.summary if hasattr(res, "summary") else str(res)
+            else:
+                output = self.coordinator.ask(prompt=prompt, include_context=True)
+            GLib.idle_add(self._finish_task, True, output, req_id)
+        except Exception as err:
+            GLib.idle_add(self._finish_task, False, f"Inference error: {err}", req_id)
+
+    def _finish_task(self, success: bool, message: str, req_id: int) -> None:
+        if req_id != self._current_request_id:
+            return
+
+        elapsed = time.perf_counter() - self._task_start_time
+
+        # Record in shared conversation store
+        if hasattr(self.coordinator, "conversation") and self.coordinator.conversation:
+            self.coordinator.conversation.append_message(
+                role="assistant",
+                text=message,
+                duration_s=elapsed,
+                status="done" if success else "failed",
+            )
+
+        if self.is_expanded:
+            # If full conversation is open, update it
+            self.expanded_view._finish_running(success, message, req_id)
+        else:
+            # Show inline response in the notch
+            self.set_phase(NotchPhase.MESSAGE, message_text=message)
+
+    def stop_task(self) -> None:
+        """Cancel active task immediately."""
+        self._current_request_id += 1
+        req_id = self._current_request_id
+        try:
+            self.coordinator.stop(reason="User stopped Sidekick task")
+        except Exception:
+            pass
+
+        if hasattr(self.coordinator, "conversation") and self.coordinator.conversation:
+            self.coordinator.conversation.append_message(
+                role="assistant",
+                text="Task stopped by user.",
+                status="stopped",
+            )
+
+        self.status_line.set_text("Stopped")
+        GLib.timeout_add(1200, lambda: self.set_phase(NotchPhase.HIDDEN) if self.phase == NotchPhase.RUNNING else False)
+
+    def expand(self, draft: str = "") -> None:
+        """
+        Explicit action to open the Full Sidekick conversation interface (780x580).
+        Triggered ONLY via arrow.up.forward.app / Open in Sentient, NOT by clicking the resting notch.
+        """
         if self.is_expanded:
             return
 
         self.is_expanded = True
 
-        # Synchronously hide, swap child, resize, and show to cleanly reallocate surface
+        # Sync conversation records from shared store
+        self.expanded_view.sync_from_store()
+        if draft:
+            self.expanded_view.chat_entry.set_text(draft)
+
+        # Synchronously swap child to expanded view
         self.set_visible(False)
         if self.pill_overlay.get_parent() is not None:
             self.pill_overlay.get_parent().remove(self.pill_overlay)
@@ -367,27 +689,28 @@ class SentientPillWindow(Gtk.Window):
         self.set_visible(True)
 
         self.expanded_view.chat_entry.grab_focus()
-        logger.info("Sentient Notch expanded upward.")
+        logger.info("Sentient Sidekick full conversation opened.")
 
     def collapse(self) -> None:
-        """Collapse back to bottom-attached dynamic island notch without stretching."""
+        """Collapse back to bottom-attached dynamic island notch without discarding state."""
         self.is_expanded = False
-        h = self.RUNNING_HEIGHT if self.is_running else self.COLLAPSED_HEIGHT
 
+        # Preserve any unsubmitted draft in shared store
+        draft_text = self.expanded_view.chat_entry.get_text()
+        if hasattr(self.coordinator, "conversation") and self.coordinator.conversation and draft_text:
+            self.coordinator.conversation.draft = draft_text
+
+        # Restore notch child
         self.set_visible(False)
         if self.expanded_view.get_parent() is not None:
             self.expanded_view.get_parent().remove(self.expanded_view)
         if self.pill_overlay.get_parent() is None:
             self.root_box.append(self.pill_overlay)
 
-        Gtk4LayerShell.set_keyboard_mode(self, Gtk4LayerShell.KeyboardMode.NONE)
-        Gtk4LayerShell.set_margin(self, Gtk4LayerShell.Edge.BOTTOM, 0)
-        self.pill_overlay.set_size_request(self.COLLAPSED_WIDTH, h)
-        self.notch_bg.set_size_request(self.COLLAPSED_WIDTH, h)
-        self.set_size_request(self.COLLAPSED_WIDTH, h)
-        self.set_default_size(self.COLLAPSED_WIDTH, h)
+        # Restore notch phase geometry
+        self.set_phase(self.phase)
         self.set_visible(True)
-        logger.info("Sentient Notch collapsed to bottom bezel.")
+        logger.info("Sentient Sidekick collapsed to bottom notch.")
 
     def _on_key_pressed(
         self,
@@ -399,5 +722,11 @@ class SentientPillWindow(Gtk.Window):
         if keyval == Gdk.KEY_Escape:
             if self.is_expanded:
                 self.collapse()
+                return True
+            elif self.phase == NotchPhase.TYPING:
+                self.set_phase(NotchPhase.HIDDEN)
+                return True
+            elif self.phase == NotchPhase.MESSAGE:
+                self.set_phase(NotchPhase.HIDDEN)
                 return True
         return False
