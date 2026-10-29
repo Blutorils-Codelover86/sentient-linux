@@ -139,11 +139,50 @@ window.sentient-pill-window {
     color: #878787;
 }
 
+.sidekick-model-btn {
+    background: transparent;
+    border: none;
+    padding: 0;
+}
+
 .sidekick-model-pill {
     background-color: rgba(255, 255, 255, 0.05);
     border: 0.75px solid rgba(255, 255, 255, 0.09);
     border-radius: 12px;
     padding: 4px 10px;
+    transition: all 120ms ease;
+}
+
+.sidekick-model-btn:hover .sidekick-model-pill {
+    background-color: rgba(255, 255, 255, 0.10);
+    border-color: rgba(255, 255, 255, 0.20);
+}
+
+.sidekick-popover contents {
+    background-color: rgba(16, 16, 20, 0.98);
+    border: 0.75px solid rgba(255, 255, 255, 0.16);
+    border-radius: 14px;
+    box-shadow: 0 16px 36px rgba(0, 0, 0, 0.75);
+}
+
+.sidekick-model-list {
+    padding: 6px 4px;
+}
+
+.sidekick-model-item {
+    background: transparent;
+    border: none;
+    border-radius: 8px;
+    color: #ededed;
+    font-size: 12px;
+    font-family: monospace;
+    padding: 6px 12px;
+    transition: all 120ms ease;
+}
+
+.sidekick-model-item:hover {
+    background-color: rgba(255, 255, 255, 0.10);
+    color: #ffffff;
 }
 
 .sidekick-context-bar {

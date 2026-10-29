@@ -102,17 +102,30 @@ class ExpandedView(Gtk.Box):
         spacer.set_hexpand(True)
         card_content.append(spacer)
 
-        # Active Model Pill Badge
+        # Active Model Pill Button with Popover Switcher
+        self.model_btn = Gtk.Button()
+        self.model_btn.add_css_class("sidekick-model-btn")
+        self.model_btn.set_tooltip_text("Click to switch AI model")
+
         model_pill = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
         model_pill.add_css_class("sidekick-model-pill")
         dot = Gtk.Label(label="●")
         dot.add_css_class("status-dot-green")
         model_pill.append(dot)
-        model_name = getattr(self.coordinator, "active_model", "qwen2.5-coder:3b")
-        model_lbl = Gtk.Label(label=model_name)
-        model_lbl.add_css_class("whisper-text")
-        model_pill.append(model_lbl)
-        card_content.append(model_pill)
+
+        active_name = getattr(self.coordinator, "active_model", "qwen2.5-coder:3b")
+        self.model_lbl = Gtk.Label(label=active_name)
+        self.model_lbl.add_css_class("whisper-text")
+        model_pill.append(self.model_lbl)
+
+        chevron = Gtk.Label(label="▾")
+        chevron.add_css_class("whisper-text")
+        model_pill.append(chevron)
+
+        self.model_btn.set_child(model_pill)
+        self._build_model_popover()
+        self.model_btn.connect("clicked", lambda _: self.model_popover.popup())
+        card_content.append(self.model_btn)
 
         # Clear Chat Button
         clear_btn = Gtk.Button(label="🗑")
@@ -135,6 +148,43 @@ class ExpandedView(Gtk.Box):
         card_container.append(self.progress_bar)
 
         self.append(card_container)
+
+    def _build_model_popover(self) -> None:
+        """Popover menu listing available AI models for instantaneous switching."""
+        self.model_popover = Gtk.Popover()
+        self.model_popover.set_parent(self.model_btn)
+        self.model_popover.add_css_class("sidekick-popover")
+
+        popover_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
+        popover_box.add_css_class("sidekick-model-list")
+
+        header = Gtk.Label(label="SELECT AI MODEL")
+        header.add_css_class("whisper-text")
+        header.set_xalign(0.0)
+        popover_box.append(header)
+
+        # Query installed models from coordinator
+        try:
+            available = self.coordinator.list_models()
+        except Exception:
+            available = []
+
+        if not available:
+            available = ["qwen2.5-coder:3b", "gemma3:1b", "qwen3:1.7b"]
+
+        for m_name in available:
+            btn = Gtk.Button(label=m_name)
+            btn.add_css_class("sidekick-model-item")
+            btn.set_halign(Gtk.Align.FILL)
+            btn.connect("clicked", lambda _, name=m_name: self._select_model(name))
+            popover_box.append(btn)
+
+        self.model_popover.set_child(popover_box)
+
+    def _select_model(self, name: str) -> None:
+        self.coordinator.set_model(name)
+        self.model_lbl.set_text(name)
+        self.model_popover.popdown()
 
     def _build_context_row(self) -> None:
         """Subtle context bar displaying active Hyprland window/desktop context."""

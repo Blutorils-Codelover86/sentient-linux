@@ -43,6 +43,8 @@ class CommandCoordinator:
         policy: Optional[SecurityPolicy] = None,
         consent_manager: Optional[ConsentManager] = None,
         event_bus: Optional[EventBus] = None,
+        model: Optional[str] = None,
+        provider: Optional[str] = None,
     ) -> None:
         self.emergency_stop = EmergencyStop()
         self.state_machine = StateMachine()
@@ -53,8 +55,22 @@ class CommandCoordinator:
         self.inspector = inspector or HyprlandInspector()
         self.screenshots = screenshots or ScreenshotEngine()
         self.context_manager = ContextManager(self.inspector, self.screenshots)
-        self.inference = inference or InferenceRouter(consent_manager=self.consent_manager)
+        self.inference = inference or InferenceRouter(
+            provider=provider,
+            model=model,
+            consent_manager=self.consent_manager,
+        )
         self.supervisor = supervisor or ActionSupervisor(policy=self.policy)
+
+    @property
+    def active_model(self) -> str:
+        return self.inference.active_model
+
+    def set_model(self, model_name: str) -> None:
+        self.inference.set_model(model_name)
+
+    def list_models(self) -> list[str]:
+        return self.inference.list_available_models()
 
     def _set_state(self, new_state: SentientState) -> None:
         old_state = self.state_machine.current_state

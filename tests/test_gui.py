@@ -140,3 +140,20 @@ def test_expanded_view_composer_and_empty_state():
     # Test collapse callback
     view.on_collapse()
     assert collapsed is True
+
+
+def test_model_switching_in_gui_and_coordinator():
+    coordinator = CommandCoordinator()
+    assert coordinator.active_model in ["qwen2.5-coder:3b", "gemma3:1b", "qwen3:1.7b", "heretic-fast:latest"]
+
+    # Switch model programmatically
+    coordinator.set_model("gemma3:1b")
+    assert coordinator.active_model == "gemma3:1b"
+
+    view = ExpandedView(coordinator=coordinator, on_collapse=lambda: None)
+    assert view.model_lbl.get_text() == "gemma3:1b"
+
+    # Switch via GUI view method
+    view._select_model("qwen3:1.7b")
+    assert coordinator.active_model == "qwen3:1.7b"
+    assert view.model_lbl.get_text() == "qwen3:1.7b"

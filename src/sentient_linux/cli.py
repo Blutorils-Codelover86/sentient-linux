@@ -250,6 +250,8 @@ def main() -> int:
         description="Sentient OS for Linux (Omarchy / Hyprland Port)",
     )
     parser.add_argument("--version", action="version", version=f"sentient {__version__}")
+    parser.add_argument("--model", "-m", help="Select AI model (e.g. qwen2.5-coder:3b, gemma3:1b, heretic-fast:latest)")
+    parser.add_argument("--provider", "-p", choices=["ollama", "openai", "anthropic"], help="Select inference provider (default: ollama)")
     subparsers = parser.add_subparsers(dest="command", help="Sub-commands")
 
     # status
@@ -301,7 +303,7 @@ def main() -> int:
         parser.print_help()
         return 0
 
-    coordinator = CommandCoordinator()
+    coordinator = CommandCoordinator(model=args.model, provider=args.provider)
     return args.func(coordinator, args)
 
 

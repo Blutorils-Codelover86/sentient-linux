@@ -6,6 +6,7 @@ Orchestrates model selection, capability validation, and execution across local 
 from __future__ import annotations
 import base64
 import logging
+import os
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -26,20 +27,49 @@ class InferenceRouter:
 
     def __init__(
         self,
-        provider: str = "ollama",
+        provider: Optional[str] = None,
         model: Optional[str] = None,
         ollama_client: Optional[OllamaClient] = None,
         consent_manager: Optional[ConsentManager] = None,
     ) -> None:
-        self.provider = provider.lower()
+        self.provider = (provider or os.environ.get("SENTIENT_PROVIDER", "ollama")).lower()
         self.consent_manager = consent_manager or ConsentManager()
         self.ollama = ollama_client or OllamaClient()
         self.openai = OpenAIProvider(consent_manager=self.consent_manager)
         self.anthropic = AnthropicProvider(consent_manager=self.consent_manager)
         self.emergency_stop = EmergencyStop()
 
-        # Selected model override
-        self._configured_model = model
+        # Selected model override (parameter or environment variable)
+        self._configured_model = model or os.environ.get("SENTIENT_MODEL")
+
+    @property
+    def active_model(self) -> str:
+        """Return the current active model name."""
+        return self.resolve_model()
+
+    @active_model.setter
+    def active_model(self, model_name: str) -> None:
+        """Dynamically switch the active model."""
+        self._configured_model = model_name
+
+    def set_model(self, model_name: str) -> None:
+        """Explicitly switch the active model."""
+        self.active_model = model_name
+
+    def list_available_models(self) -> List[str]:
+        """List all models available for the active provider."""
+        if self.provider == "ollama":
+            try:
+                models = self.ollama.list_models()
+                return [m.name for m in models]
+            except Exception as e:
+                logger.warning("Failed to list Ollama models: %s", e)
+                return []
+        elif self.provider == "openai":
+            return ["gpt-4o", "gpt-4o-mini", "o1-mini", "o3-mini"]
+        elif self.provider == "anthropic":
+            return ["claude-3-5-sonnet-20241022", "claude-3-5-haiku-20241022", "claude-3-opus-20240229"]
+        return []
 
     def resolve_model(self) -> str:
         """Resolve the active model for the configured provider."""
