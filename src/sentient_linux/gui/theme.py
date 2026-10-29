@@ -5,14 +5,14 @@ Faithfully ported from Sentient OS macOS:
 - SidekickStyle.swift
 - SidekickComposer.swift
 - SidekickTranscript.swift
-- NotchView.swift
+- NotchView.swift & NotchShape.swift
 - SpinningLogo.swift
 - GlowButton.swift
 """
 
 from __future__ import annotations
 from dataclasses import dataclass
-from typing import List, Tuple
+from typing import Tuple
 
 # RGBA tuples (0.0 - 1.0)
 ColorRGBA = Tuple[float, float, float, float]
@@ -86,53 +86,92 @@ window.sentient-pill-window {
 }
 
 /* =========================================================================
-   BOTTOM-CENTER PILL (COLLAPSED NOTCH)
+   BOTTOM-ATTACHED DYNAMIC ISLAND NOTCH (Flush to Screen Bottom Bezel)
    ========================================================================= */
-.sidekick-pill, .living-glass-pill {
-    background-color: rgba(14, 14, 17, 0.82);
-    border: 0.75px solid rgba(255, 255, 255, 0.12);
-    border-radius: 22px;
-    padding: 7px 16px;
-    box-shadow: 0 10px 32px rgba(0, 0, 0, 0.75), 0 0 16px rgba(158, 140, 255, 0.12);
-    transition: all 180ms cubic-bezier(0.16, 1, 0.3, 1);
+.bottom-notch-pill, .sidekick-pill {
+    background-color: transparent;
+    border: none;
+    padding: 0;
+    margin: 0;
 }
 
-.sidekick-pill:hover, .living-glass-pill:hover {
-    background-color: rgba(22, 22, 28, 0.90);
-    border-color: rgba(255, 255, 255, 0.22);
-    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.85), 0 0 24px rgba(158, 140, 255, 0.25);
+.bottom-notch-content {
+    padding: 4px 22px 6px 22px;
 }
 
 /* =========================================================================
-   SIDEKICK EXPANDED WINDOW SURFACE
+   SIDEKICK EXTENDED WINDOW SURFACE (Flush to Screen Bottom Bezel)
    ========================================================================= */
 .sidekick-expanded, .living-glass-expanded {
-    background-color: rgba(10, 10, 13, 0.88);
-    border: 0.75px solid rgba(255, 255, 255, 0.12);
-    border-radius: 24px;
-    box-shadow: 0 24px 64px rgba(0, 0, 0, 0.90), 0 0 32px rgba(158, 140, 255, 0.15);
-    padding: 20px 24px;
+    background-color: rgba(10, 10, 13, 0.94);
+    border: 0.75px solid rgba(255, 255, 255, 0.14);
+    border-bottom: none;
+    border-top-left-radius: 24px;
+    border-top-right-radius: 24px;
+    border-bottom-left-radius: 0;
+    border-bottom-right-radius: 0;
+    box-shadow: 0 -24px 64px rgba(0, 0, 0, 0.90), 0 0 32px rgba(158, 140, 255, 0.10);
+    padding: 16px 24px 14px 24px;
 }
 
-/* Header & Toolbars */
-.sidekick-header {
-    padding-bottom: 6px;
+/* =========================================================================
+   OFFICIAL TOP NAVIGATION BAR (HomeView.swift topBar parity)
+   ========================================================================= */
+.sidekick-top-bar {
+    padding-bottom: 10px;
+    border-bottom: 0.5px solid rgba(255, 255, 255, 0.06);
+    margin-bottom: 6px;
 }
 
-.sidekick-title {
-    font-size: 15px;
+.sidekick-brand-title {
+    font-size: 13.5px;
     font-weight: 600;
-    color: #ededed;
+    color: #ffffff;
+    letter-spacing: -0.1px;
+}
+
+.sidekick-proactive-dock {
+    background-color: rgba(255, 255, 255, 0.05);
+    border: 0.75px solid rgba(255, 255, 255, 0.09);
+    border-radius: 14px;
+    padding: 3px 10px;
+    color: #cfcdd6;
+    font-size: 11px;
+    font-weight: 500;
+    transition: all 140ms ease-out;
+}
+
+.sidekick-proactive-dock:hover {
+    background-color: rgba(255, 255, 255, 0.10);
+    border-color: rgba(255, 255, 255, 0.20);
+    color: #ffffff;
+}
+
+.sidekick-nav-item {
+    background-color: transparent;
+    border: none;
+    color: #878787;
+    font-size: 12px;
+    font-weight: 500;
+    padding: 5px 8px;
+    border-radius: 10px;
+    transition: all 140ms ease-out;
+}
+
+.sidekick-nav-item:hover {
+    background-color: rgba(255, 255, 255, 0.06);
+    color: #ffffff;
 }
 
 .sidekick-tool-btn {
-    min-width: 34px;
-    min-height: 34px;
-    border-radius: 17px;
+    min-width: 32px;
+    min-height: 32px;
+    border-radius: 16px;
     background-color: rgba(255, 255, 255, 0.04);
     border: 0.75px solid rgba(255, 255, 255, 0.08);
     color: #cfcdd6;
     padding: 0;
+    font-size: 13px;
     transition: all 140ms ease-out;
 }
 
@@ -146,7 +185,7 @@ window.sentient-pill-window {
    EMPTY STATE (SidekickTranscript.swift parity)
    ========================================================================= */
 .sidekick-empty-title {
-    font-size: 22px;
+    font-size: 23px;
     font-weight: 500;
     color: #ededed;
     letter-spacing: -0.2px;
@@ -162,7 +201,7 @@ window.sentient-pill-window {
    MESSAGES & TRANSCRIPT (SidekickTranscript.swift parity)
    ========================================================================= */
 .sidekick-transcript {
-    padding: 8px 4px;
+    padding: 6px 4px;
 }
 
 /* User Message: Right-anchored, #131313 fill, radius 18px, padding 12px 17px */
@@ -307,16 +346,6 @@ window.sentient-pill-window {
     color: #ededed;
 }
 
-.context-chip {
-    background-color: rgba(255, 255, 255, 0.04);
-    border: 0.75px solid rgba(255, 255, 255, 0.08);
-    border-radius: 8px;
-    padding: 3px 8px;
-    font-family: monospace;
-    font-size: 10px;
-    color: #878787;
-}
-
 .status-dot-green {
     color: #4ade80;
     font-size: 11px;
@@ -325,39 +354,5 @@ window.sentient-pill-window {
 .status-dot-amber {
     color: #ffc371;
     font-size: 11px;
-}
-
-/* Backward compatibility classes */
-.chat-entry {
-    background-color: rgba(255, 255, 255, 0.05);
-    border: 1px solid rgba(255, 255, 255, 0.10);
-    border-radius: 14px;
-    color: #ededed;
-    padding: 8px 12px;
-    font-size: 13px;
-}
-
-.action-btn {
-    background-color: rgba(255, 255, 255, 0.06);
-    border: 1px solid rgba(255, 255, 255, 0.10);
-    border-radius: 12px;
-    color: #cfcdd6;
-    padding: 6px 12px;
-    font-size: 12px;
-}
-
-.history-card-user {
-    background-color: #131313;
-    border-radius: 18px;
-    padding: 10px 14px;
-    color: #ededed;
-    font-size: 13px;
-}
-
-.history-card-assistant {
-    background-color: transparent;
-    padding: 6px 10px;
-    color: #ededed;
-    font-size: 13px;
 }
 """

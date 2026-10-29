@@ -91,20 +91,23 @@ def test_pill_window_expansion_and_collapse():
         reduced_motion=True,
     )
 
-    # Initially collapsed
+    # Initially collapsed flush to bottom bezel
     assert window.is_expanded is False
     assert Gtk4LayerShell.is_layer_window(window) is True
     assert Gtk4LayerShell.get_layer(window) == Gtk4LayerShell.Layer.TOP
+    assert Gtk4LayerShell.get_margin(window, Gtk4LayerShell.Edge.BOTTOM) == 0
 
     # Test expansion
     window.expand()
     assert window.is_expanded is True
     assert Gtk4LayerShell.get_keyboard_mode(window) == Gtk4LayerShell.KeyboardMode.ON_DEMAND
+    assert Gtk4LayerShell.get_margin(window, Gtk4LayerShell.Edge.BOTTOM) == 0
 
     # Test collapse
     window.collapse()
     assert window.is_expanded is False
     assert Gtk4LayerShell.get_keyboard_mode(window) == Gtk4LayerShell.KeyboardMode.NONE
+    assert Gtk4LayerShell.get_margin(window, Gtk4LayerShell.Edge.BOTTOM) == 0
 
 
 def test_expanded_view_composer_and_empty_state():

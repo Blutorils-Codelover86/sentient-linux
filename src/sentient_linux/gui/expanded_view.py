@@ -1,7 +1,8 @@
 """
 Expanded Sentient Sidekick interface for Linux.
 Faithfully ports the upstream Sidekick experience from macOS:
-- SidekickTranscript.swift (empty state, message hierarchy, user bubbles)
+- HomeView.swift topBar (wordmark, proactive dock, nav items)
+- SidekickTranscript.swift (empty state hero, user bubbles, assistant markdown)
 - SidekickComposer.swift (rounded glass capsule, 36x36 circular send button with conic halo)
 - SidekickWorkDisclosure.swift (step disclosure card, live status)
 """
@@ -24,7 +25,7 @@ from sentient_linux.gui.theme import THEME
 class ExpandedView(Gtk.Box):
     """
     Main expanded interaction surface for Sentient Sidekick on Linux.
-    Faithful port of upstream SidekickOverviewLayout and SidekickTranscript.
+    Direct translation of upstream HomeView topBar + SidekickTranscript + SidekickComposer.
     """
 
     def __init__(
@@ -32,12 +33,12 @@ class ExpandedView(Gtk.Box):
         coordinator: CommandCoordinator,
         on_collapse: Callable[[], None],
     ) -> None:
-        super().__init__(orientation=Gtk.Orientation.VERTICAL, spacing=14)
+        super().__init__(orientation=Gtk.Orientation.VERTICAL, spacing=12)
         self.coordinator = coordinator
         self.on_collapse = on_collapse
 
         self.add_css_class("sidekick-expanded")
-        self.set_size_request(680, 520)
+        self.set_size_request(780, 580)
 
         self._is_running = False
         self._history_records: List[dict] = []
@@ -46,79 +47,81 @@ class ExpandedView(Gtk.Box):
         self._work_timer_label: Optional[Gtk.Label] = None
         self._task_start_time: float = 0.0
 
-        # 1. Header Toolbar (Logo, Title, Model selector, Clear chat, Collapse)
-        self._build_header()
+        # 1. Official Top Navigation Bar (HomeView.swift lines 385-430)
+        self._build_top_bar()
 
-        # 2. Desktop Context Chip
-        self._build_context_chip()
-
-        # 3. Conversation & Transcript Area
+        # 2. Conversation & Transcript Area (SidekickTranscript.swift)
         self._build_transcript_area()
 
-        # 4. Floating Composer Capsule
+        # 3. Floating Composer Capsule (SidekickComposer.swift)
         self._build_composer()
 
-        # Initial context probe
-        self.refresh_context()
+    def _build_top_bar(self) -> None:
+        top_bar = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
+        top_bar.add_css_class("sidekick-top-bar")
 
-    def _build_header(self) -> None:
-        header = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
-        header.add_css_class("sidekick-header")
+        # Left 1: SidekickMark (size: 18, illuminated: true)
+        mark = SidekickMark(size=18, illuminated=True)
+        top_bar.append(mark)
 
-        # Mascot
-        self.mascot = LivingMascot(size=24)
-        header.append(self.mascot)
+        # Left 2: "Sentient OS" Wordmark (HomeView.swift line 388)
+        brand_label = Gtk.Label(label="Sentient OS")
+        brand_label.add_css_class("sidekick-brand-title")
+        top_bar.append(brand_label)
 
-        # Brand Title
-        title_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=1)
-        self.title_label = Gtk.Label(label="Sidekick")
-        self.title_label.set_xalign(0.0)
-        self.title_label.add_css_class("sidekick-title")
-        title_box.append(self.title_label)
+        # Left 3: Proactive Dock Pill (HomeView.swift lines 432-452)
+        proactive_btn = Gtk.Button(label="☵  Proactive")
+        proactive_btn.set_tooltip_text("Proactive Intelligence Suggestions")
+        proactive_btn.add_css_class("sidekick-proactive-dock")
+        top_bar.append(proactive_btn)
 
-        active_model = self.coordinator.inference.resolve_model()
-        self.model_status_label = Gtk.Label(label=f"● {active_model}")
-        self.model_status_label.set_xalign(0.0)
-        self.model_status_label.add_css_class("status-dot-green")
-        title_box.append(self.model_status_label)
-        header.append(title_box)
-
-        # Spacer
+        # Spacer pushing navigation to the right
         spacer = Gtk.Box()
         spacer.set_hexpand(True)
-        header.append(spacer)
+        top_bar.append(spacer)
 
-        # Clear Chat Button
+        # Right 1: Search Button (HomeView.swift line 393)
+        search_btn = Gtk.Button(label="🔍")
+        search_btn.set_tooltip_text("Search Conversation (⌘F)")
+        search_btn.add_css_class("sidekick-tool-btn")
+        top_bar.append(search_btn)
+
+        # Right 2: Clear Chat Button (HomeView.swift line 401)
         clear_btn = Gtk.Button(label="🗑")
         clear_btn.set_tooltip_text("Clear Conversation")
         clear_btn.add_css_class("sidekick-tool-btn")
         clear_btn.connect("clicked", lambda _: self.clear_chat())
-        header.append(clear_btn)
+        top_bar.append(clear_btn)
 
-        # Collapse Button (⌄ Down chevron representing downward collapse to bottom pill)
+        # Right 3: Analysis Status NavItem (HomeView.swift line 410)
+        analysis_btn = Gtk.Button(label="●  Analysis")
+        analysis_btn.set_tooltip_text("System & Desktop Analysis Status")
+        analysis_btn.add_css_class("sidekick-nav-item")
+        top_bar.append(analysis_btn)
+
+        # Right 4: Knowledge NavItem (HomeView.swift line 420)
+        knowledge_btn = Gtk.Button(label="📚 Knowledge")
+        knowledge_btn.set_tooltip_text("Knowledge Vault")
+        knowledge_btn.add_css_class("sidekick-nav-item")
+        top_bar.append(knowledge_btn)
+
+        # Right 5: Settings Button (HomeView.swift line 423)
+        settings_btn = Gtk.Button(label="⚙")
+        settings_btn.set_tooltip_text("Settings (⌘,)")
+        settings_btn.add_css_class("sidekick-tool-btn")
+        top_bar.append(settings_btn)
+
+        # Right 6: Collapse Button (⌄ down chevron)
         collapse_btn = Gtk.Button(label="⌄")
-        collapse_btn.set_tooltip_text("Collapse (Esc)")
+        collapse_btn.set_tooltip_text("Collapse to Bezel (Esc)")
         collapse_btn.add_css_class("sidekick-tool-btn")
         collapse_btn.connect("clicked", lambda _: self.on_collapse())
-        header.append(collapse_btn)
+        top_bar.append(collapse_btn)
 
-        self.append(header)
+        self.append(top_bar)
 
-    def _build_context_chip(self) -> None:
-        self.context_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
-        self.context_label = Gtk.Label(label="Context: Loading...")
-        self.context_label.set_xalign(0.0)
-        self.context_label.add_css_class("context-chip")
-        self.context_label.set_hexpand(True)
-        self.context_box.append(self.context_label)
-
-        refresh_btn = Gtk.Button(label="⟳")
-        refresh_btn.set_tooltip_text("Refresh Desktop Context")
-        refresh_btn.add_css_class("context-chip")
-        refresh_btn.connect("clicked", lambda _: self.refresh_context())
-        self.context_box.append(refresh_btn)
-
-        self.append(self.context_box)
+    def _build_transcript_area() -> None:
+        pass
 
     def _build_transcript_area(self) -> None:
         self.scroller = Gtk.ScrolledWindow()
@@ -133,10 +136,10 @@ class ExpandedView(Gtk.Box):
         self.empty_state_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
         self.empty_state_box.set_valign(Gtk.Align.CENTER)
         self.empty_state_box.set_vexpand(True)
-        self.empty_state_box.set_margin_top(60)
-        self.empty_state_box.set_margin_bottom(60)
+        self.empty_state_box.set_margin_top(80)
+        self.empty_state_box.set_margin_bottom(80)
 
-        # SidekickMark(size: 32, illuminated: true)
+        # SidekickMark(size: 36, illuminated: true)
         mark = SidekickMark(size=36, illuminated=True)
         mark.set_halign(Gtk.Align.CENTER)
         self.empty_state_box.append(mark)
@@ -237,9 +240,6 @@ class ExpandedView(Gtk.Box):
         # 2. Add Work Disclosure Card (SidekickWorkDisclosure)
         self._add_work_disclosure("Thinking…")
 
-        # Set Mascot to Thinking/Acting
-        self.mascot.state = MascotState.THINKING
-
         # Scroll to bottom
         self._scroll_to_bottom()
 
@@ -300,7 +300,6 @@ class ExpandedView(Gtk.Box):
     def _finish_running(self, success: bool, message: str) -> None:
         """Complete task and present assistant response."""
         self._is_running = False
-        self.mascot.state = MascotState.IDLE if success else MascotState.ERROR
 
         # Reset send button
         self.send_button.remove_css_class("sidekick-stop-btn")
@@ -325,7 +324,6 @@ class ExpandedView(Gtk.Box):
 
     def clear_chat(self) -> None:
         """Clear transcript and restore empty state."""
-        # Remove all children from content_box
         while True:
             child = self.content_box.get_first_child()
             if child is None:
@@ -336,20 +334,6 @@ class ExpandedView(Gtk.Box):
         self._work_status_label = None
         self._work_timer_label = None
         self.content_box.append(self.empty_state_box)
-
-    def refresh_context(self) -> None:
-        """Fetch current active window / desktop context."""
-        def _fetch():
-            try:
-                ctx = self.coordinator.context_manager.build_context(include_screenshot=False)
-                active_app = ctx.focused_window.title if ctx and ctx.focused_window else "Desktop"
-                win_count = len(ctx.windows) if ctx else 0
-                text = f"Context: {active_app[:28]} ({win_count} windows)"
-            except Exception:
-                text = "Context: Desktop"
-            GLib.idle_add(self.context_label.set_text, text)
-
-        threading.Thread(target=_fetch, daemon=True).start()
 
     def _scroll_to_bottom(self) -> None:
         def _do_scroll():
