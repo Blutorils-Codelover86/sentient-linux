@@ -69,8 +69,8 @@ class BottomNotchShapeBackground(Gtk.DrawingArea):
 
     def __init__(
         self,
-        top_radius: float = 14.0,
-        shoulder_radius: float = 10.0,
+        top_radius: float = 16.0,
+        shoulder_radius: float = 12.0,
         has_glow: bool = False,
     ) -> None:
         super().__init__()
@@ -78,19 +78,12 @@ class BottomNotchShapeBackground(Gtk.DrawingArea):
         self.shoulder_radius = shoulder_radius
         self.has_glow = has_glow
         self._glow_angle = 0.0
-        self.animated_width = 340.0
-        self.animated_height = 44.0
         self.set_draw_func(self._on_draw)
 
         if self.has_glow:
             self._tick_id = self.add_tick_callback(self._on_tick_glow)
         else:
             self._tick_id = 0
-
-    def set_notch_size(self, width: float, height: float) -> None:
-        self.animated_width = width
-        self.animated_height = height
-        self.queue_draw()
 
     def set_glow(self, active: bool) -> None:
         self.has_glow = active
@@ -111,33 +104,24 @@ class BottomNotchShapeBackground(Gtk.DrawingArea):
     def _on_draw(self, area: Gtk.DrawingArea, cr: cairo.Context, width: int, height: int) -> None:
         s_r = float(self.shoulder_radius)
         t_r = float(self.top_radius)
-
-        # Center symmetrically on canvas: left = cx - w/2, right = cx + w/2
-        cx = float(width) / 2.0
-        nw = float(self.animated_width)
-        nh = float(self.animated_height)
-
-        # Symmetric coordinate rounding to prevent subpixel jitter
-        left = round(cx - nw / 2.0)
-        right = round(cx + nw / 2.0)
-        top = round(float(height) - nh)
-        bottom = float(height)
+        w = float(width)
+        h = float(height)
 
         # 1. Edge Glow (when AI is working / task is running)
         if self.has_glow:
             for lw, alpha in [(8.0, 0.25), (4.0, 0.55), (1.5, 0.95)]:
                 cr.save()
-                cr.move_to(left, bottom)
-                cr.curve_to(left + s_r * 0.55, bottom, left + s_r, bottom - s_r * 0.45, left + s_r, bottom - s_r)
-                cr.line_to(left + s_r, top + t_r)
-                cr.curve_to(left + s_r, top + t_r * 0.45, left + s_r + t_r * 0.45, top, left + s_r + t_r, top)
-                cr.line_to(right - s_r - t_r, top)
-                cr.curve_to(right - s_r - t_r * 0.45, top, right - s_r, top + t_r * 0.45, right - s_r, top + t_r)
-                cr.line_to(right - s_r, bottom - s_r)
-                cr.curve_to(right - s_r, bottom - s_r * 0.45, right - s_r * 0.55, bottom, right, bottom)
+                cr.move_to(0, h)
+                cr.curve_to(s_r * 0.55, h, s_r, h - s_r * 0.45, s_r, h - s_r)
+                cr.line_to(s_r, t_r)
+                cr.curve_to(s_r, t_r * 0.45, s_r + t_r * 0.45, 0, s_r + t_r, 0)
+                cr.line_to(w - s_r - t_r, 0)
+                cr.curve_to(w - s_r - t_r * 0.45, 0, w - s_r, t_r * 0.45, w - s_r, t_r)
+                cr.line_to(w - s_r, h - s_r)
+                cr.curve_to(w - s_r, h - s_r * 0.45, w - s_r * 0.55, h, w, h)
 
                 # Rotating angular gradient pattern along the skirt
-                pat = cairo.LinearGradient(left, top, right, bottom)
+                pat = cairo.LinearGradient(0, 0, w, h)
                 n = len(self.GLOW_STOPS)
                 for i, (r_c, g_c, b_c) in enumerate(self.GLOW_STOPS):
                     pos = (i / (n - 1) + self._glow_angle / (2 * math.pi)) % 1.0
@@ -149,15 +133,15 @@ class BottomNotchShapeBackground(Gtk.DrawingArea):
                 cr.restore()
 
         # 2. Path for solid fill (including flat bottom along the bezel)
-        cr.move_to(left, bottom)
-        cr.curve_to(left + s_r * 0.55, bottom, left + s_r, bottom - s_r * 0.45, left + s_r, bottom - s_r)
-        cr.line_to(left + s_r, top + t_r)
-        cr.curve_to(left + s_r, top + t_r * 0.45, left + s_r + t_r * 0.45, top, left + s_r + t_r, top)
-        cr.line_to(right - s_r - t_r, top)
-        cr.curve_to(right - s_r - t_r * 0.45, top, right - s_r, top + t_r * 0.45, right - s_r, top + t_r)
-        cr.line_to(right - s_r, bottom - s_r)
-        cr.curve_to(right - s_r, bottom - s_r * 0.45, right - s_r * 0.55, bottom, right, bottom)
-        cr.line_to(left, bottom)
+        cr.move_to(0, h)
+        cr.curve_to(s_r * 0.55, h, s_r, h - s_r * 0.45, s_r, h - s_r)
+        cr.line_to(s_r, t_r)
+        cr.curve_to(s_r, t_r * 0.45, s_r + t_r * 0.45, 0, s_r + t_r, 0)
+        cr.line_to(w - s_r - t_r, 0)
+        cr.curve_to(w - s_r - t_r * 0.45, 0, w - s_r, t_r * 0.45, w - s_r, t_r)
+        cr.line_to(w - s_r, h - s_r)
+        cr.curve_to(w - s_r, h - s_r * 0.45, w - s_r * 0.55, h, w, h)
+        cr.line_to(0, h)
         cr.close_path()
 
         # Fill dark OLED acrylic (#0c0c0e)
@@ -165,14 +149,14 @@ class BottomNotchShapeBackground(Gtk.DrawingArea):
         cr.fill()
 
         # 3. Open Skirt Path (NotchSkirtShape.swift parity): stroke only visible edges
-        cr.move_to(left, bottom)
-        cr.curve_to(left + s_r * 0.55, bottom, left + s_r, bottom - s_r * 0.45, left + s_r, bottom - s_r)
-        cr.line_to(left + s_r, top + t_r)
-        cr.curve_to(left + s_r, top + t_r * 0.45, left + s_r + t_r * 0.45, top, left + s_r + t_r, top)
-        cr.line_to(right - s_r - t_r, top)
-        cr.curve_to(right - s_r - t_r * 0.45, top, right - s_r, top + t_r * 0.45, right - s_r, top + t_r)
-        cr.line_to(right - s_r, bottom - s_r)
-        cr.curve_to(right - s_r, bottom - s_r * 0.45, right - s_r * 0.55, bottom, right, bottom)
+        cr.move_to(0, h)
+        cr.curve_to(s_r * 0.55, h, s_r, h - s_r * 0.45, s_r, h - s_r)
+        cr.line_to(s_r, t_r)
+        cr.curve_to(s_r, t_r * 0.45, s_r + t_r * 0.45, 0, s_r + t_r, 0)
+        cr.line_to(w - s_r - t_r, 0)
+        cr.curve_to(w - s_r - t_r * 0.45, 0, w - s_r, t_r * 0.45, w - s_r, t_r)
+        cr.line_to(w - s_r, h - s_r)
+        cr.curve_to(w - s_r, h - s_r * 0.45, w - s_r * 0.55, h, w, h)
 
         # Stroke visible razor border (0.75px)
         cr.set_source_rgba(1.0, 1.0, 1.0, 0.16)
@@ -199,11 +183,6 @@ class SentientPillWindow(Gtk.Window):
         NotchPhase.RUNNING: (420, 68),
         NotchPhase.MESSAGE: (520, 220),
     }
-
-    # Outer layer-shell fixed canvas dimensions accommodating maximum interactive notch + slack
-    # 544 logical px = 680 physical px at 1.25x scale -> centered at 620 physical px on 1920 display (center = 960.0 px)
-    CANVAS_WIDTH = 544
-    CANVAS_HEIGHT = 240
 
     COLLAPSED_WIDTH = 340
     COLLAPSED_HEIGHT = 44
@@ -245,7 +224,7 @@ class SentientPillWindow(Gtk.Window):
 
         self.add_css_class("sentient-pill-window")
 
-        # 1. Initialize Wayland Layer Shell with fixed canvas
+        # 1. Initialize Wayland Layer Shell
         self._init_layer_shell()
 
         # 2. Install CSS Theme
@@ -255,7 +234,6 @@ class SentientPillWindow(Gtk.Window):
         self.root_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
         self.root_box.set_halign(Gtk.Align.CENTER)
         self.root_box.set_valign(Gtk.Align.END)
-        self.root_box.set_size_request(self.CANVAS_WIDTH, self.CANVAS_HEIGHT)
         self.set_child(self.root_box)
 
         # 4. Build Notch Overlay & Full Expanded View
@@ -269,14 +247,6 @@ class SentientPillWindow(Gtk.Window):
         key_controller = Gtk.EventControllerKey()
         key_controller.connect("key-pressed", self._on_key_pressed)
         self.add_controller(key_controller)
-
-        # 6. Bind surface input region on realize / map
-        self.connect("realize", lambda _: self._update_input_region())
-        self.connect("map", lambda _: self._update_input_region())
-
-        # Set fixed outer surface size
-        self.set_size_request(self.CANVAS_WIDTH, self.CANVAS_HEIGHT)
-        self.set_default_size(self.CANVAS_WIDTH, self.CANVAS_HEIGHT)
 
         # Set initial resting notch state
         self.set_phase(NotchPhase.HIDDEN)
@@ -313,23 +283,17 @@ class SentientPillWindow(Gtk.Window):
         self.pill_overlay = Gtk.Overlay()
         self.pill_overlay.set_halign(Gtk.Align.CENTER)
         self.pill_overlay.set_valign(Gtk.Align.END)
-        self.pill_overlay.set_size_request(self.CANVAS_WIDTH, self.CANVAS_HEIGHT)
         self.pill_overlay.add_css_class("bottom-notch-pill")
 
         # Inverted NotchShape background canvas
-        self.notch_bg = BottomNotchShapeBackground(top_radius=14.0, shoulder_radius=10.0)
-        self.notch_bg.set_size_request(self.CANVAS_WIDTH, self.CANVAS_HEIGHT)
-        self.notch_bg.set_notch_size(self._current_width, self._current_height)
+        self.notch_bg = BottomNotchShapeBackground(top_radius=16.0, shoulder_radius=12.0)
         self.pill_overlay.set_child(self.notch_bg)
 
-        # Dynamic Stack for Notch Phases
+        # Dynamic Stack for Notch Phases (transition NONE prevents asymmetric squashing twitch)
         self.pill_stack = Gtk.Stack()
-        self.pill_stack.set_transition_type(Gtk.StackTransitionType.CROSSFADE)
-        self.pill_stack.set_transition_duration(180)
+        self.pill_stack.set_transition_type(Gtk.StackTransitionType.NONE)
         self.pill_stack.set_hhomogeneous(False)
         self.pill_stack.set_vhomogeneous(False)
-        self.pill_stack.set_halign(Gtk.Align.CENTER)
-        self.pill_stack.set_valign(Gtk.Align.END)
 
         # --- Phase 1: Idle Resting Notch (NotchPhase.HIDDEN) ---
         self._build_idle_view()
@@ -454,8 +418,7 @@ class SentientPillWindow(Gtk.Window):
         """Resting notch (340x44): Completely hover-driven to expand into TYPING."""
         self.idle_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
         self.idle_box.add_css_class("bottom-notch-content")
-        self.idle_box.set_valign(Gtk.Align.END)
-        self.idle_box.set_halign(Gtk.Align.CENTER)
+        self.idle_box.set_valign(Gtk.Align.CENTER)
         self.idle_box.set_size_request(340, 44)
 
         self.pill_mascot = LivingMascot(
@@ -479,8 +442,7 @@ class SentientPillWindow(Gtk.Window):
         """Interactive notch for quick prompt (480x72): Esc cancels, Send submits."""
         self.typing_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
         self.typing_box.add_css_class("bottom-notch-content")
-        self.typing_box.set_valign(Gtk.Align.END)
-        self.typing_box.set_halign(Gtk.Align.CENTER)
+        self.typing_box.set_valign(Gtk.Align.CENTER)
         self.typing_box.set_size_request(480, 72)
         self.typing_box.set_margin_start(16)
         self.typing_box.set_margin_end(16)
@@ -521,8 +483,7 @@ class SentientPillWindow(Gtk.Window):
         """Active progress notch (420x68): GlowHalo edge glow, status narration, STOP button."""
         self.running_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=3)
         self.running_box.add_css_class("bottom-notch-content")
-        self.running_box.set_valign(Gtk.Align.END)
-        self.running_box.set_halign(Gtk.Align.CENTER)
+        self.running_box.set_valign(Gtk.Align.CENTER)
         self.running_box.set_size_request(420, 68)
         self.running_box.set_margin_start(16)
         self.running_box.set_margin_end(16)
@@ -563,8 +524,7 @@ class SentientPillWindow(Gtk.Window):
         """Inline response & reply view (520x220) (SidekickNotchMessageView parity)."""
         self.message_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
         self.message_box.add_css_class("bottom-notch-content")
-        self.message_box.set_valign(Gtk.Align.END)
-        self.message_box.set_halign(Gtk.Align.CENTER)
+        self.message_box.set_valign(Gtk.Align.CENTER)
         self.message_box.set_size_request(520, 220)
         self.message_box.set_margin_start(16)
         self.message_box.set_margin_end(16)
@@ -635,35 +595,7 @@ class SentientPillWindow(Gtk.Window):
 
         self.pill_stack.add_named(self.message_box, "message")
 
-    def _update_input_region(self) -> None:
-        """
-        Confine pointer interception strictly to the visible notch silhouette.
-        Ensures all transparent areas outside the notch pass clicks and hovers through
-        directly to underlying desktop windows without creating an invisible blocking box.
-        """
-        native = self.get_native()
-        if not native:
-            return
-        surface = native.get_surface()
-        if not surface:
-            return
-
-        if self.is_expanded:
-            rect = cairo.RectangleInt(0, 0, self.EXPANDED_WIDTH, self.EXPANDED_HEIGHT)
-        else:
-            cx = self.CANVAS_WIDTH / 2.0
-            w = self._current_width
-            h = self._current_height
-            left = max(0, int(math.floor(cx - w / 2.0)))
-            top = max(0, int(math.floor(self.CANVAS_HEIGHT - h)))
-            width_int = min(self.CANVAS_WIDTH - left, int(math.ceil(w)))
-            height_int = min(self.CANVAS_HEIGHT - top, int(math.ceil(h)))
-            rect = cairo.RectangleInt(left, top, width_int, height_int)
-
-        region = cairo.Region(rect)
-        surface.set_input_region(region)
-
-    def _on_morph_tick(self, _widget: Gtk.Widget, frame_clock: Gdk.FrameClock) -> bool:
+    def _on_morph_tick(self, widget: Gtk.Widget, frame_clock: Gdk.FrameClock) -> bool:
         """Frame-clock tick animation for smooth, symmetric notch morphing."""
         if self.is_expanded:
             self._morph_tick_id = 0
@@ -680,32 +612,35 @@ class SentientPillWindow(Gtk.Window):
         tw = self._target_width
         th = self._target_height
 
-        if self.reduced_motion:
-            self._current_width = tw
-            self._current_height = th
-            self.notch_bg.set_notch_size(self._current_width, self._current_height)
-            self._update_input_region()
-            self._morph_tick_id = 0
-            return False
-
-        # Physics-based smooth spring/decay interpolation (~220ms settling time)
         alpha = min(1.0, 1.0 - math.exp(-22.0 * dt))
         dw = tw - self._current_width
         dh = th - self._current_height
 
-        if abs(dw) < 0.25 and abs(dh) < 0.25:
+        if abs(dw) < 1.0 and abs(dh) < 1.0:
             self._current_width = tw
             self._current_height = th
-            self.notch_bg.set_notch_size(self._current_width, self._current_height)
-            self._update_input_region()
+            curr_w = int(tw)
+            curr_h = int(th)
+            self.pill_overlay.set_size_request(curr_w, curr_h)
+            self.notch_bg.set_size_request(curr_w, curr_h)
+            self.set_size_request(curr_w, curr_h)
+            self.set_default_size(curr_w, curr_h)
+            self.pill_stack.set_visible_child_name(self.phase.value)
             self._morph_tick_id = 0
             return False
 
         self._current_width += dw * alpha
         self._current_height += dh * alpha
+        curr_w = int(self._current_width)
+        curr_h = int(self._current_height)
 
-        self.notch_bg.set_notch_size(self._current_width, self._current_height)
-        self._update_input_region()
+        if self.phase == NotchPhase.TYPING and curr_w >= 450:
+            self.pill_stack.set_visible_child_name("typing")
+
+        self.pill_overlay.set_size_request(curr_w, curr_h)
+        self.notch_bg.set_size_request(curr_w, curr_h)
+        self.set_size_request(curr_w, curr_h)
+        self.set_default_size(curr_w, curr_h)
         return True
 
     def open_notch_input(self) -> None:
@@ -716,7 +651,7 @@ class SentientPillWindow(Gtk.Window):
         self.set_phase(NotchPhase.TYPING)
 
     def set_phase(self, phase: NotchPhase, message_text: str = "") -> None:
-        """Switch notch phase and smoothly animate geometry without window resizing."""
+        """Switch notch phase and smoothly animate geometry without widget clipping."""
         self.phase = phase
         w, h = self.PHASE_DIMENSIONS[phase]
 
@@ -735,8 +670,6 @@ class SentientPillWindow(Gtk.Window):
         elif phase == NotchPhase.HIDDEN:
             self.pill_mascot.set_state(MascotState.IDLE)
 
-        self.pill_stack.set_visible_child_name(phase.value)
-
         if not self.is_expanded:
             self._target_width = float(w)
             self._target_height = float(h)
@@ -744,9 +677,20 @@ class SentientPillWindow(Gtk.Window):
             if self.reduced_motion:
                 self._current_width = float(w)
                 self._current_height = float(h)
-                self.notch_bg.set_notch_size(float(w), float(h))
-                self._update_input_region()
+                self.pill_stack.set_visible_child_name(phase.value)
+                self.pill_overlay.set_size_request(w, h)
+                self.notch_bg.set_size_request(w, h)
+                self.set_size_request(w, h)
+                self.set_default_size(w, h)
             else:
+                if phase == NotchPhase.HIDDEN:
+                    # Immediately switch visible child so typing box does not clip
+                    self.pill_stack.set_visible_child_name("hidden")
+                elif phase == NotchPhase.TYPING and self._current_width >= 450:
+                    self.pill_stack.set_visible_child_name("typing")
+                else:
+                    self.pill_stack.set_visible_child_name(phase.value)
+
                 if self._morph_tick_id == 0:
                     self._last_frame_time = 0
                     self._morph_tick_id = self.add_tick_callback(self._on_morph_tick)
@@ -895,11 +839,9 @@ class SentientPillWindow(Gtk.Window):
 
         Gtk4LayerShell.set_keyboard_mode(self, Gtk4LayerShell.KeyboardMode.ON_DEMAND)
         Gtk4LayerShell.set_margin(self, Gtk4LayerShell.Edge.BOTTOM, 0)
-        self.root_box.set_size_request(self.EXPANDED_WIDTH, self.EXPANDED_HEIGHT)
         self.set_size_request(self.EXPANDED_WIDTH, self.EXPANDED_HEIGHT)
         self.set_default_size(self.EXPANDED_WIDTH, self.EXPANDED_HEIGHT)
         self.set_visible(True)
-        self._update_input_region()
 
         self.expanded_view.chat_entry.grab_focus()
         logger.info("Sentient Sidekick full conversation opened.")
@@ -920,14 +862,9 @@ class SentientPillWindow(Gtk.Window):
         if self.pill_overlay.get_parent() is None:
             self.root_box.append(self.pill_overlay)
 
-        # Restore fixed canvas dimensions and notch geometry
-        Gtk4LayerShell.set_margin(self, Gtk4LayerShell.Edge.BOTTOM, 0)
-        self.root_box.set_size_request(self.CANVAS_WIDTH, self.CANVAS_HEIGHT)
-        self.set_size_request(self.CANVAS_WIDTH, self.CANVAS_HEIGHT)
-        self.set_default_size(self.CANVAS_WIDTH, self.CANVAS_HEIGHT)
+        # Restore notch phase geometry
         self.set_phase(self.phase)
         self.set_visible(True)
-        self._update_input_region()
         logger.info("Sentient Sidekick collapsed to bottom notch.")
 
     def _on_key_pressed(
