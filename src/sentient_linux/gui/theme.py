@@ -553,4 +553,188 @@ window.sentient-pill-window {
     font-size: 13px;
     line-height: 1.45;
 }
+
+/* =========================================================================
+   OFFICIAL KNOWLEDGE VAULT (Split View & Reader)
+   ========================================================================= */
+window.knowledge-window {
+    background-color: #0c0c0e;
+    color: #ededed;
+}
+
+.knowledge-sidebar {
+    background-color: #0e0f12;
+    border-right: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.knowledge-reader {
+    background-color: #000000;
+}
+
+.knowledge-markdown-container a {
+    color: #6fb6ff;
+    text-decoration: underline;
+}
+
+.knowledge-markdown-container a:hover {
+    color: #8ea6ff;
+}
+
+.knowledge-header {
+    background-color: #09090b;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    padding: 10px 18px;
+}
+
+.knowledge-search-box {
+    background-color: rgba(255, 255, 255, 0.05);
+    border: 0.75px solid rgba(255, 255, 255, 0.10);
+    border-radius: 9px;
+    padding: 6px 10px;
+}
+
+.knowledge-search-box:focus-within {
+    background-color: rgba(255, 255, 255, 0.08);
+    border-color: rgba(142, 166, 255, 0.40);
+}
+
+.knowledge-search-entry {
+    background-color: transparent;
+    border: none;
+    outline: none;
+    color: #ffffff;
+    font-size: 13px;
+    caret-color: #8ea6ff;
+    padding: 2px 4px;
+}
+
+.knowledge-row {
+    border-radius: 6px;
+    padding: 5px 8px;
+    transition: background-color 100ms ease;
+}
+
+.knowledge-row:hover {
+    background-color: rgba(255, 255, 255, 0.045);
+}
+
+.knowledge-row-selected {
+    background-color: rgba(142, 166, 255, 0.12);
+    color: #8ea6ff;
+}
+
+.knowledge-row-selected label {
+    color: #8ea6ff;
+    font-weight: 500;
+}
+
+.knowledge-btn {
+    background-color: rgba(255, 255, 255, 0.06);
+    border: 0.75px solid rgba(255, 255, 255, 0.12);
+    border-radius: 8px;
+    color: rgba(255, 255, 255, 0.90);
+    font-size: 12.5px;
+    font-weight: 500;
+    padding: 4px 10px;
+    transition: all 120ms ease;
+}
+
+.knowledge-btn:hover {
+    background-color: rgba(255, 255, 255, 0.12);
+    border-color: rgba(255, 255, 255, 0.22);
+    color: #ffffff;
+}
+
+.knowledge-btn-primary {
+    background-color: #8ea6ff;
+    border: 1px solid rgba(255, 255, 255, 0.40);
+    border-radius: 8px;
+    color: #000000;
+    font-size: 12.5px;
+    font-weight: 600;
+    padding: 4px 12px;
+}
+
+.knowledge-btn-primary:hover {
+    background-color: #a4b7ff;
+}
+
+.knowledge-code-block {
+    background-color: rgba(255, 255, 255, 0.045);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    border-radius: 9px;
+    padding: 12px 14px;
+}
+
+.knowledge-code-text {
+    font-family: monospace;
+    font-size: 12.5px;
+    color: rgba(255, 255, 255, 0.78);
+    line-height: 1.4;
+}
+
+.knowledge-h1 {
+    font-family: serif;
+    font-size: 25px;
+    font-weight: normal;
+    color: #ffffff;
+}
+
+.knowledge-h2 {
+    font-family: serif;
+    font-size: 20px;
+    font-weight: normal;
+    color: #ffffff;
+}
+
+.knowledge-h3 {
+    font-family: serif;
+    font-size: 15.5px;
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.96);
+}
+
+.knowledge-body-text {
+    font-size: 14.5px;
+    color: rgba(255, 255, 255, 0.82);
+    line-height: 1.55;
+}
+
+.knowledge-bullet-marker {
+    color: rgba(255, 255, 255, 0.42);
+    font-size: 15px;
+}
+
+.knowledge-divider {
+    background-color: rgba(255, 255, 255, 0.08);
+    min-height: 1px;
+}
+
+.knowledge-mono-caps {
+    font-family: monospace;
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.40);
+}
+
+.knowledge-title {
+    font-family: serif;
+    font-size: 30px;
+    font-weight: normal;
+    color: #ffffff;
+}
+
+.knowledge-empty-title {
+    font-size: 20px;
+    font-weight: 500;
+    color: #e9e7ee;
+}
+
+.knowledge-empty-subtitle {
+    font-size: 13px;
+    color: rgba(255, 255, 255, 0.55);
+    line-height: 1.45;
+}
 """

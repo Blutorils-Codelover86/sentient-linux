@@ -20,6 +20,8 @@ from sentient_linux.gui.mascot import LivingMascot, MascotState
 from sentient_linux.gui.glass import LivingGlassContainer
 from sentient_linux.gui.expanded_view import ExpandedView
 from sentient_linux.gui.pill_window import SentientPillWindow
+from sentient_linux.gui.knowledge_view import SentientKnowledgeVaultWindow
+from sentient_linux.gui.markdown_renderer import MarkdownBlockRenderer
 from sentient_linux.gui.app import SentientApplication, run_gui
 
 __all__ = [
@@ -30,6 +32,8 @@ __all__ = [
     "LivingGlassContainer",
     "ExpandedView",
     "SentientPillWindow",
+    "SentientKnowledgeVaultWindow",
+    "MarkdownBlockRenderer",
     "SentientApplication",
     "run_gui",
 ]

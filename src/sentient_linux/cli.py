@@ -244,6 +244,24 @@ def cmd_gui(coordinator: CommandCoordinator, args: argparse.Namespace) -> int:
     )
 
 
+def cmd_vault(coordinator: CommandCoordinator, args: argparse.Namespace) -> int:
+    """Launch the native Sentient Knowledge Vault window."""
+    import gi
+    gi.require_version("Gtk", "4.0")
+    from gi.repository import Gtk
+    from sentient_linux.gui.knowledge_view import SentientKnowledgeVaultWindow
+
+    print("Opening Sentient Knowledge Vault...")
+    app = Gtk.Application(application_id="ai.sentient.linux.knowledge")
+
+    def on_activate(application):
+        win = SentientKnowledgeVaultWindow(app=application, vault_path=getattr(args, "vault_dir", None))
+        win.present()
+
+    app.connect("activate", on_activate)
+    return app.run([])
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(
         prog="sentient",
@@ -297,6 +315,11 @@ def main() -> int:
     p_gui.add_argument("--low-power", action="store_true", help="Enable low-power rendering mode (30 FPS)")
     p_gui.add_argument("--reduced-motion", action="store_true", help="Disable procedural spinning animations")
     p_gui.set_defaults(func=cmd_gui)
+
+    # vault / knowledge
+    p_vault = subparsers.add_parser("vault", aliases=["knowledge"], help="Open the Knowledge Vault window")
+    p_vault.add_argument("--vault-dir", help="Custom vault directory path (default: ~/Sentient OS - Knowledge Base)")
+    p_vault.set_defaults(func=cmd_vault)
 
     args = parser.parse_args()
     if not args.command:
