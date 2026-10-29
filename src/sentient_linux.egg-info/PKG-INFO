@@ -1,0 +1,106 @@
+Metadata-Version: 2.4
+Name: sentient-linux
+Version: 0.2.0
+Summary: Sentient OS Linux Core Engine and MCP Integration for Arch Linux / Omarchy / Hyprland
+Author: Antigravity Engineering
+License: AGPL-3.0
+Classifier: Development Status :: 3 - Alpha
+Classifier: Environment :: X11 Applications
+Classifier: Intended Audience :: End Users/Desktop
+Classifier: License :: OSI Approved :: GNU Affero General Public License v3 (AGPLv3)
+Classifier: Operating System :: POSIX :: Linux
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3.11
+Classifier: Programming Language :: Python :: 3.12
+Classifier: Programming Language :: Python :: 3.13
+Classifier: Programming Language :: Python :: 3.15
+Requires-Python: >=3.11
+Description-Content-Type: text/markdown
+License-File: LICENSE
+License-File: NOTICE.md
+Dynamic: license-file
+
+# Sentient OS for Linux (Omarchy / Hyprland Port)
+
+A privacy-centric personal AI desktop companion engineered for Arch Linux running Omarchy on Hyprland. Downstream adaptation of [Sentient OS](https://github.com/Sentient-OS-Labs/sentient-os).
+
+Licensed under the **GNU Affero General Public License Version 3 (AGPL-3.0)**. See [LICENSE](LICENSE) and [NOTICE.md](NOTICE.md).
+
+---
+
+## Architecture
+
+Sentient Linux separates the AI assistance lifecycle into five decoupled layers:
+
+1. **Perception:** Real-time Hyprland window/desktop state queries (`hyprctl -j`) and on-demand screenshot capture (`grim`).
+2. **Reasoning:** Provider-agnostic inference router connecting to local Ollama (`http://127.0.0.1:11434`) and optional consent-gated cloud frontier models.
+3. **Security:** Deterministic default-deny authorization gate (`SecurityPolicy`), PII scanner/sanitizer, and emergency killswitch (`EmergencyStop`).
+4. **Computer Use:** Standard Model Context Protocol (MCP) client communicating with `@agent-sh/computer-use-linux`.
+5. **Memory:** Atomic, symlink-safe Markdown knowledge storage (`~/Sentient OS - Knowledge Base/`).
+
+---
+
+## Quickstart
+
+### Prerequisites
+- Arch Linux / Omarchy with Hyprland
+- Python 3.11+
+- `grim`, `wtype`, `wl-clipboard`
+- Ollama running locally
+
+### Installation
+
+```bash
+cd /home/blu/sentient-os-port
+
+# Create virtualenv and install in editable mode
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -e .
+```
+
+### Usage
+
+```bash
+# Check status of desktop, Hyprland, Ollama, and MCP
+sentient status
+
+# Inspect the active/focused window
+sentient focused
+
+# List open client windows
+sentient windows
+
+# Capture on-demand screenshot (auto-cleaned)
+sentient screenshot
+
+# List inference models
+sentient models
+
+# View security permissions
+sentient permissions
+
+# Ask assistant a question with desktop context
+sentient ask "What window is currently open?"
+
+# Test Emergency Stop
+sentient stop
+```
+
+### Running Tests
+
+```bash
+pytest -v -s
+```
+
+---
+
+## Documentation
+
+- [Architecture Specification](docs/architecture.md)
+- [Setup & Installation](docs/setup.md)
+- [Security Model & Safety Gates](docs/security_model.md)
+- [AI Provider Configuration](docs/provider_configuration.md)
+- [Phase 3 Readiness Report](docs/phase3_readiness.md)
+- [Upstream Lineage](UPSTREAM.md)
+- [Changelog & Modifications](CHANGES.md)
